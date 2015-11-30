@@ -17,6 +17,7 @@ def interpz(x, sz2):
     tmp2[:,:,sz2/2-sz[2]/2:sz2/2+sz[2]/2] = (tmp[:,:,:]* filt)
     return np.abs(fftshift(ifft(fftshift(tmp2, axes=[-1]), axis=-1), axes=[-1]))
 
+
 def interp3d(x, sz2):
     tmp = fftshift(fftn(fftshift(x, axes=[0,1,2]), axes=[0,1,2]), axes=[0,1,2])
     sz = tmp.shape
@@ -33,7 +34,10 @@ def interp3d(x, sz2):
 
     tmp2 = np.zeros(sz2, dtype=tmp.dtype)
     tmp2[sz2[0]/2-sz[0]/2:sz2[0]/2+sz[0]/2, sz2[1]/2-sz[1]/2:sz2[1]/2+sz[1]/2, sz2[2]/2-sz[2]/2:sz2[2]/2+sz[2]/2] = tmp[:,:,:]
+
     return np.abs(fftshift(fftn(fftshift(tmp2, axes=[0,1,2]), axes=[0,1,2]), axes=[0,1,2]))
+
+
 
 def filt3d(x, lvl):
     tmp = fftshift(fftn(fftshift(x, axes=[0,1,2]), axes=[0,1,2]), axes=[0,1,2])
@@ -49,9 +53,7 @@ def filt3d(x, lvl):
     filt = np.kaiser(sz[2], lvl).reshape(1,1,-1)
     tmp = tmp * filt
 
-
     return np.abs(fftshift(ifftn(fftshift(tmp, axes=[0,1,2]), axes=[0,1,2]), axes=[0,1,2]))
-
 
 
 
@@ -86,7 +88,9 @@ def vfa_fit(flips, data, tr, b1):
     return mnot, t1s, mask
 
 
+
 def vfa_polyfit(flips, data, tr, b1):
+
     flips.shape=(-1,1)
     b1.shape=(1,-1)
     sa = np.sin(flips*b1)
@@ -116,6 +120,7 @@ def vfa_polyfit(flips, data, tr, b1):
     mnot[np.isnan(t1s)]=0
 
     return mnot, t1s, mask
+
 
 
 def emos_fit(flips, data, tr, b1):

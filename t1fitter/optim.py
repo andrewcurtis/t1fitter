@@ -1,11 +1,11 @@
 import scipy
 import scipy.linalg
 from scipy.optimize import minimize
-from traits.api import HasTraits, Float, List, Int, Array, Double
+from traits.api import HasTraits, Float, List, Int, Array, Double, Object
 
-class T1Optimize(HasTraits):
+class T1Fit(HasTraits):
 
-
+    params = Object
 
     def init_guess(self):
         # make guess based on options:
@@ -22,6 +22,28 @@ class T1Optimize(HasTraits):
 
     def init_penalties(self):
         pass
+
+    def objective(self, x):
+        pass
+
+
+    def gradient(self):
+        pass
+
+    def run_fit(self):
+        pass
+
+    def to_vol(self, x):
+        x.shape = self.params.volshape
+
+    def to_flat(self, x):
+        x.shape = (-1, self.params.volshape[-1])
+
+
+
+
+
+class T1FitNLLSReg(T1Fit):
 
     def objective(self, x):
 
@@ -66,48 +88,106 @@ class T1Optimize(HasTraits):
                                  self.params.b1,
                                  self.params.tr)
 
+        # TODO: how to mult in mask? need to avoid transpose, fix model deriv shape
         deriv = np.sum( - (diffs[np.newaxis, :, :] * deriv) , axis=1)
 
-    def run_optimize(self):
+
+
+
+    def wrap_opt(x0, fit_params, mlim=20):
+        #flatten
+        nx = x0.shape[0]
+        bnds = np.zeros((nx, 2))
+
+        #mo
+        bnds[::2,0] = 0.00001
+        bnds[::2,1 ] = mlim
+        #t1
+        bnds[1::2,0] = 0.01
+        bnds[1::2,1 ] = 10.0
+
+        # TODO: version check to know if args needs a list wrapper or not
+
+        res = minimize(fun = wrap_obj, x0=x0, args = [fit_params],
+                        method='L-BFGS-B', jac = wrap_jac, bounds = bnds,
+                        options={'maxcor':20, 'ftol':fit_params.ftol})
+
+        return res
+
+    def run_fit(self):
         pass
 
-    def to_vol(self, x):
-        x.shape = self.params.volshape
-
-    def to_flat(self, x):
-        x.shape = (-1, self.params.volshape[-1])
+    def multisolve(self):
+        """ Iteratuve solution with gradual penalty reduction """
+        pass
 
 
 
 
-def wrap_obj(x, fit_params):
-    x.shape = (fit_params.nx * fit_params.ny * fit_params.nz, -1)
-    res = objective(x, fit_params)
-    x.shape = (-1)
-    return res
+
+class T1FitVFA(T1Fit):
+
+    def run_fit():
+        pass
 
 
-def wrap_jac(x, fit_params):
-    jac = jacobian(x, fit_params).copy()
-    jac.shape = (-1)
-    return jac
+    def vfa_polyfit(flips, data, tr, b1):
 
+        flips.shape=(-1,1)
+        b1.shape=(1,-1)
+        sa = np.sin(flips*b1)
+        ta = np.tan(flips*b1)
 
-def wrap_opt(x0, fit_params, mlim=20):
-    #flatten
-    x = x0.copy().reshape(-1)
-    nx = x.shape[0]
-    bnds = np.zeros((nx, 2))
+        ys = data / sa
+        xs = data / ta
 
-    #mo
-    bnds[::2,0] = 0.00001
-    bnds[::2,1 ] = mlim
-    #t1
-    bnds[1::2,0] = 0.01
-    bnds[1::2,1 ] = 10.0
+        fits = np.zeros((xs.shape[1],2))
+        mask = b1.ravel() > 0.05*np.max(abs(b1))
 
-    res = minimize(fun = wrap_obj, x0=x, args = [fit_params],
-                    method='L-BFGS-B', jac = wrap_jac, bounds = bnds,
-                    options={'maxcor':20, 'ftol':fit_params.ftol})
+        for j in range(xs.shape[1]):
+            if mask[j]:
+                fits[j,:] = np.polyfit(xs[:,j], ys[:,j], 1)
 
-    return res
+        t1s = -tr/np.log(fits[:,0])
+        t1s[np.isnan(t1s)]=0
+        t1s[np.isinf(t1s)]=0
+        t1s[mask<1]=0
+
+        m0 = (fits[:,1])
+
+        mnot =  m0 / (1-np.exp(-(tr)/t1s))
+
+        mnot[np.isnan(t1s)]=0
+        mnot[np.isinf(t1s)]=0
+
+        return mnot, t1s, mask
+
+    def vfa_fit(flips, data, tr, b1):
+
+        flips.shape = (-1,1)
+        b1.shape = (1,-1)
+        sa = np.sin(flips*b1)
+        ta = np.tan(flips*b1)
+
+        ys = data / sa
+        xs = data / ta
+
+        fits = np.zeros((xs.shape[1],2))
+
+        mask = b1.ravel() > 0.05*np.max(np.abs(b1))
+
+        fits[:,0] = (ys[1,:] - ys[0,:])/(xs[1,:] - xs[0,:])
+        fits[:,1] = ys[1,:] - fits[:,0].T*xs[1,:]
+
+        t1s = -tr/np.log(fits[:,0])
+        t1s[np.isnan(t1s)]=0
+        t1s[np.isinf(t1s)]=0
+        t1s[mask<1]=0
+
+        m0 = (fits[:,1])
+        mnot =  m0 / (1-np.exp(-(tr)/t1s))
+        mnot[np.isnan(mnot)]=0
+        mnot[np.isinf(mnot)]=0
+        mnot[mask<1]=0
+
+        return mnot, t1s, mask
