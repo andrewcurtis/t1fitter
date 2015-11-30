@@ -125,7 +125,7 @@ class T1FitNLLSReg(T1Fit):
 
 
 
-class T1FitVFA(T1Fit):
+class T1FitDirect(T1Fit):
 
     def run_fit():
         pass
@@ -162,6 +162,7 @@ class T1FitVFA(T1Fit):
 
         return mnot, t1s, mask
 
+
     def vfa_fit(flips, data, tr, b1):
 
         flips.shape = (-1,1)
@@ -191,3 +192,29 @@ class T1FitVFA(T1Fit):
         mnot[mask<1]=0
 
         return mnot, t1s, mask
+
+
+    def emos_fit(flips, data, tr, b1):
+
+        flips.shape=(2)
+        b1.shape=(-1)
+
+        s1 = data[0,:]
+        s2 = data[1,:]
+
+        mask = b1.ravel() > 0.05*np.max(np.abs(b1))
+
+        s0 = s1/(b1*flips[0])
+
+        e1calc = (s0*np.sin(b1*flips[1]) - s2) / (s0*np.sin(b1*flips[1])-s2*np.cos(b1*flips[1]))
+        t1s = -tr/np.log(e1calc)
+
+        t1s[np.isnan(t1s)]=0
+        t1s[np.isinf(t1s)]=0
+        t1s[mask<1]=0
+
+        s0[np.isnan(s0)]=0
+        s0[np.isinf(s0)]=0
+        s0[mask<1]=0
+
+        return s0, t1s, mask
