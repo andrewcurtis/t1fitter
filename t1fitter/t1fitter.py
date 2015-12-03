@@ -13,7 +13,7 @@ import nibabel as nib
 import logging
 import os
 
-from traits.api import HasTraits, Float, List, Int, Array, Double, Directory
+from traits.api import HasTraits, Float, List, Int, Array, Directory, Bool, Enum
 
 class T1Fitter(HasTraits):
 
@@ -61,9 +61,6 @@ class T1Fitter(HasTraits):
         self.log = logging.getLogger('T1Fit')
         #default off
         self.log.setLevel(0)
-
-    def load_file_list(self, files):
-        pass
 
 
     def set_fit_params(self):
@@ -128,13 +125,18 @@ class T1Fitter(HasTraits):
         # align to main image, saving transformation
     
         # extract and transform fa150
+        # get filenames
+        
+        if len(mos_args) != 2:
+            self.log.debug('Found wrong number of MOS volumes for b1 calibration!')
+            
+        pass        
+        
+
+
+    def run_preproc_b1bs(self, args):
         
         pass
-
-
-    def run_preproc_b1bs(self):
-        pass
-
 
     def write_nifti(self, vol, fname):
         
@@ -142,60 +144,61 @@ class T1Fitter(HasTraits):
         tmp.to_filename(fname)
         
         
-    def load_vols(self):
+    def load_vols(self, dest, files):
 
-        nvols = len(self.file_list)
+        nvols = len(files)
         #find datasize
-        tmp = nib.load(self.file_list[0])
+        tmp = nib.load(files[0])
         dat_sz = tmp.get_shape()
         
         self.log.info('First vol had shape: {}'.format(dat_sz))
         
         dat_sz = nvols + list(dat_sz)
         
-        self.log.info('Creating self.data with shape {}'.format(dat_sz))
+        self.log.info('Alloc array memory with shape {}'.format(dat_sz))
         
-        self.data = np.zeros(dat_sz, dtype=tmp.get_data_dtype())
+        dest = np.zeros(dat_sz, dtype=tmp.get_data_dtype())
         
-        for idx, f in enumerate(self.file_list):
+        for idx, f in enumerate(files):
             self.log.info('Loading volume {}: {}'.format(idx, f))
             tmp  = nib.load(f).get_data()
-            self.data[idx, ...] = tmp
+            dest[idx, ...] = tmp
         
+
 
 
     def init_from_cli(self, args):
         
         
-        self.l1_lam = args['l1lam']
-        self.l2_lam = args['l2lam']
+        self.l1_lam = args.l1lam
+        self.l2_lam = args.l2lam
         
-        if args['l1'] == False:
+        if args.l1 == False:
             self.l1_lam = 0.0
             
-        if args['l2'] == False:
+        if args.l2 == False:
             self.l2_lam = 0.0
             
-        self.l2_mode = args['l2mode']
+        self.l2_mode = args.l2mode
         
-        self.kern_sz = args['kern_radius']
-        self.huber_scale = args['huber_scale']
+        self.kern_sz = args.kern_radius
+        self.huber_scale = args.huber_scale
         
-        self.fit_method = args['huber_scale']
-        self.smooth_fac = args['smooth']
+        self.fit_method = args.huber_scale
+        self.smooth_fac = args.smooth
         
         
-        if args['verbose']:
+        if args.verbose:
             self.log.setLevel(logging.INFO)
         
-        if args['debug']:
+        if args.debug:
             self.log.setLevel(logging.DEBUG)
             
             
         # get filenames
         tmp_tr = []
         tmp_fa = []
-        for vol in args['addvol']:
+        for vol in args.addvol:
             self.file_list.append(vol.vol)
             tmp_fa.append(vol.flip)
             tmp_tr.append(vol.tr)
@@ -204,26 +207,26 @@ class T1Fitter(HasTraits):
         self.trs = np.array(tmp_tr)
         
         
-        if args['preproc']:
+        if args.preproc:
             log.info('preprocessing selected, running')
             self.run_preproc()
         
         # preprocessing will change file_list entries, so load after.
-        self.load_vols()
+        self.load_vols(self.data, self.file_list)
         
         
-        if args['maskvol'] is not None:
+        if args.maskvol is not None:
             log.info('Found mask volume, overriding self.mask')
-            self.mask = nib.load(args['maskvol']).get_data()
+            self.mask = nib.load().get_data()
             
-        if args['b1vol'] is not None:
-            self.b1map = nib.load(args['b1vol']).get_data()
+        if args.b1vol is not None:
+            self.b1map = nib.load(args.b1vol).get_data()
         else:
             log.info('No b1 map given, looking for source data to generate map.')
             #if no b1, check if we can process it from the arguments
-            if args['mosvol'] is not None:
+            if args.mosvol is not None:
                 log.info('B1 MOS data found, processing.')
-                self.run_preproc_b1mos(args['mosvol'])
+                self.run_preproc_b1mos(args.mosvol)
             
         self.check_data_sizes()
         
@@ -300,6 +303,9 @@ def t1fit_cli():
 
     cmd_args = parser.parse_args()
     
+    print(cmd_args)
+    
+    
     fitter = T1Fitter()
     fitter.init_from_cli(cmd_args)
     
@@ -308,4 +314,4 @@ def t1fit_cli():
 
 
 if __name__ == '__main__':
-    main()
+    t1fit_cli()
