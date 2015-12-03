@@ -14,7 +14,7 @@ from ctypes import pythonapi, c_void_p
 
 from numba import autojit, jit, void, double, int64
 
-from traits.api import HasTraits, Float, List, Int, Array, Double
+from traits.api import HasTraits, Float, List, Int, Array, CFloat
 
 
 savethread = pythonapi.PyEval_SaveThread
@@ -66,12 +66,12 @@ class TikohnovDiffReg3D(Regularizer3D):
 
 
 class ParallelHuber2ClassReg3D(Regularizer3D):
-"""
-Two-class huber penalty. Huber l1/l2 crossover is at 1.0, so scale the data.
-Classes are assumed to be interleaved (e.g. datashape is (nz, ny, nx, 2))
+    """
+    Two-class huber penalty. Huber l1/l2 crossover is at 1.0, so scale the data.
+    Classes are assumed to be interleaved (e.g. datashape is (nz, ny, nx, 2))
 
-"""
-
+    """
+    
     scratch = Array
     kern_sz = Int
     kern_weights = Array
@@ -343,7 +343,8 @@ Classes are assumed to be interleaved (e.g. datashape is (nz, ny, nx, 2))
 
 
 class Huber2ClassReg3D(Regularizer3D):
-""" Implements a single threaded version of huber regularizer for testing """
+    """ Implements a single threaded version of huber regularizer for testing """
+    
     scratch = Array
     kern_sz = Int
     kern_weights = Array
@@ -413,8 +414,8 @@ class Huber2ClassReg3D(Regularizer3D):
 
         self.kern_weights = g
 
-    @autojit(nopython=True)
     @staticmethod
+    @autojit(nopython=True)
     def huber_single(imgs, weights, kernel_sz):
         n_slices, n_rows, n_cols, n_channels = imgs.shape
         max_sz = weights.shape[0]
@@ -458,8 +459,8 @@ class Huber2ClassReg3D(Regularizer3D):
                                 accum += tmp * w
         return accum
 
-    @autojit(nopython=True)
     @staticmethod
+    @autojit(nopython=True)
     def ghuber_single(imgs, weights, kernel_sz, output ):
         n_slices, n_rows, n_cols, n_channels = imgs.shape
         max_sz = weights.shape[0]

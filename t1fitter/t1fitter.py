@@ -13,7 +13,12 @@ import nibabel as nib
 import logging
 import os
 
-from traits.api import HasTraits, Float, List, Int, Array, Directory, Bool, Enum
+import model
+import optim
+import util
+import regularization
+
+from traits.api import HasTraits, Float, List, Int, Array, Directory, Bool, Enum, String
 
 class T1Fitter(HasTraits):
     
@@ -23,8 +28,7 @@ class T1Fitter(HasTraits):
     trs = Array
     flips = Array
     
-    debug_lvl = Int(0)
-    out_path = Directory
+    outname = String
     
     #data
     b1map = Array
@@ -33,9 +37,19 @@ class T1Fitter(HasTraits):
     fit = Array
     prior = Array
     
+    volshape = List
+    
+    fit_method = Enum('vfa','emos','nlreg')
+    
     #fitting parameters
     t1_range = Array
     m0_range = Array
+    kern_sz = Int(1)
+    #recriprocal huber cutoff
+    huber_scale = Float(3.0)
+    #params for BFGS
+    fit_tol = Float(1e-5)
+    maxcor = Int(25)
     
     #remember affine matrix for output
     base_image_affine = Array
@@ -43,15 +57,20 @@ class T1Fitter(HasTraits):
     l1_lam = Float(1e-3)
     l2_lam = Float(1e-4)
     l2_prior = Bool(False)
+    l2_mode = Enum('zero','vfa','smooth_vfa')
+    start_mode = Enum('zero','vfa','smooth_vfa')
+
     
-    kern_sz = Int(1)
-    #recriprocal huber cutoff
-    huber_scale = Float(3.0)
+    # to pass to solver
+    lambdas = List
+    penalties = List
     
+
+    
+    #params for preproc
     smooth_fac = Float(25.0)
     crop_padding = Int(4)
     
-    fit_method = Enum('vfa','emos','nlreg')
     
     
     def __init__(self):
@@ -77,7 +96,6 @@ class T1Fitter(HasTraits):
     
     def save_fit_results(self):
         
-        self.log.info('')
         
         fname = os.path.join(self.outname, 'm0_{}.nii.gz'.format(self.fit_method))
         self.log.info('Saving M0 volume to {}'.format(fname))
@@ -147,6 +165,8 @@ class T1Fitter(HasTraits):
         tmp = nib.load(files[0])
         dat_sz = tmp.get_shape()
         
+        self.volshape = list(dat_sz)
+        
         self.log.info('First vol had shape: {}'.format(dat_sz))
         
         dat_sz = nvols + list(dat_sz)
@@ -165,6 +185,7 @@ class T1Fitter(HasTraits):
     
     def init_from_cli(self, args):
         
+        self.log.info('Parsing CLI: {}'.format(args))
         
         self.l1_lam = args.l1lam
         self.l2_lam = args.l2lam
@@ -177,12 +198,15 @@ class T1Fitter(HasTraits):
         
         self.l2_mode = args.l2mode
         
+        self.start_mode = args.startmode
+        
         self.kern_sz = args.kern_radius
         self.huber_scale = args.huber_scale
         
-        self.fit_method = args.huber_scale
+        self.fit_method = args.fit_method
         self.smooth_fac = args.smooth
         
+        self.outname = args.out
         
         if args.verbose:
             self.log.setLevel(logging.INFO)
@@ -190,21 +214,23 @@ class T1Fitter(HasTraits):
         if args.debug:
             self.log.setLevel(logging.DEBUG)
             
-        
+        if args.addvol is None:
+            self.log.error('Need input volumes!')
+            
         # get filenames
         tmp_tr = []
         tmp_fa = []
         for vol in args.addvol:
-            self.file_list.append(vol.vol)
-            tmp_fa.append(vol.flip)
-            tmp_tr.append(vol.tr)
+            self.file_list.append(vol[0])
+            tmp_fa.append(vol[1])
+            tmp_tr.append(vol[2])
         
-        self.flips = np.array(tmp_fa)
-        self.trs = np.array(tmp_tr)
+        self.flips = np.array(tmp_fa).astype(float) * np.pi / 180.0
+        self.trs = np.array(tmp_tr).astype(float) * 1e-3
         
         
         if args.preproc:
-            log.info('preprocessing selected, running')
+            self.log.info('preprocessing selected, running')
             self.run_preproc()
         
         # preprocessing will change file_list entries, so load after.
@@ -212,7 +238,7 @@ class T1Fitter(HasTraits):
         
         
         if args.maskvol is not None:
-            log.info('Found mask volume, overriding self.mask')
+            self.log.info('Found mask volume, overriding self.mask')
             self.mask = nib.load().get_data()
         
         if args.b1vol is not None:
@@ -225,6 +251,64 @@ class T1Fitter(HasTraits):
                 self.run_preproc_b1mos(args.mosvol)
         
         self.check_data_sizes()
+        
+    
+    def make_smooth_vfa(self):
+        pass
+        
+        
+    def vfa_fit(self):
+        tfit = T1FitDirect(self)
+        
+        takeflips = [0,1]
+        #make a copy we can discard after, since some of the fitting munges the shapes
+        flips = self.flips[takeflips,...].copy()
+        data = self.data[takeflips,...].copy()
+        trs = self.trs[takeflips,...].copy()
+        b1 = self.b1map.copy()
+        
+        
+        self.fit = tfit.vfa_fit(flips, data, trs, b1map )
+        
+        
+    def nlreg_fit(self):
+        
+        # TODO: run vfa fit to find m0, in order to scale data properly.
+        # want mean(t1) ~ mean(m0)
+        
+        #setup prior if we're using it
+        if self.l2_lam > 0:
+            
+            regl = None
+            if self.l2_mode == 'smooth_vfa':
+                #copy data
+                tmp_dat = self.data.copy()
+                
+                #smooth and fit
+                self.make_smooth_vfa()
+                self.prior = self.fit.copy
+                
+                #replace
+                self.data = tmp_dat
+                
+                regl = regularization.TikohnovDiffReg3D(self.prior)
+            else:
+                regl = regularization.TikohnovReg3D()
+            
+            self.lambdas.append(self.l2_lam)
+            
+            self.penalties.append(regl)
+           
+        if self.l1_lam > 0: 
+            hubreg = regularization.ParallelHuber2ClassReg3D(kern_sz=self.kernel_sz)
+            self.lambdas.append(self.l1_lam)
+            self.penalties.append(hubreg)
+        
+        # set up functions for optimizer
+        self.model_func = model.spgr_flat
+        self.model_deriv = model.spgr_deriv_mt
+        
+        
     
     
     def check_data_sizes():
@@ -245,9 +329,9 @@ class T1Fitter(HasTraits):
 def t1fit_cli():
     
     parser = argparse.ArgumentParser(description='T1fitter. VFA, eMOS, and NLReg, with optional preprocessing.')
-    parser.add_argument('--addvol', '-a', nargs=3,  action='append', metavar=('vol','flip','tr'),
+    
+    parser.add_argument('--addvol', '-a', nargs=3,  action='append', metavar=('vol','flip','tr'), required=True,
                         help='Add volume for fitting with flip angle (deg) and tr (ms)')
-
     
     parser.add_argument('--out', '-o', default='t1fit',
                         help='Output volume base name for t1 and m0 fit.')
@@ -288,14 +372,24 @@ def t1fit_cli():
                         help='Enable l2 Tikhonov penalty. See  -l2lam to set penatly scaling. ')
     parser.add_argument('--l2lam', type=float, default=1e-3,
                         help='l2 lambda: scaling factor for Tikhonov penalty')
-    parser.add_argument('--l2mode', choices=['zero','smooth_vfa'], default='zero',
+    parser.add_argument('--l2mode', choices=['zero','vfa','smooth_vfa'], default='zero',
                         help='l2 Tikhonov penalty mode -- Distance from smooth prior, or zero (normal Tik). ')
+    
+    parser.add_argument('--startmode', choices=['zero','vfa','smooth_vfa'], default='zero',
+                        help='Start mode -- start from zero or from vfa guess. ')
     
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Verbose output.')
     parser.add_argument('--debug', '-d', action='store_true',
                         help='Debug output.')
+                        
+    parser.add_argument('--fit_method', choices=['vfa','emos','nlreg'], default='vfa', 
+                        help='Fit method.')
+    
 
+    #simulation opions
+    parser.add_argument('--addnoise', type=float, default=-1,
+                        help='Add noise. Normaize input data to 1 and add this std() worth of noise.')
     
     cmd_args = parser.parse_args()
     
@@ -304,7 +398,7 @@ def t1fit_cli():
     
     fitter = T1Fitter()
     fitter.init_from_cli(cmd_args)
-    
+    fitter.run_fit()
     
 
 
