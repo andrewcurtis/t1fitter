@@ -116,20 +116,15 @@ class T1Fitter(HasTraits):
     
     def run_preproc(self):
         # skull strip main vol and keep mask
-        #fsl['bet']()
         
-        # estimate extents fslstats -write_nifti
-        
-        # parse extents and grow by max kern size
-        
-        # crop roi
-        
-        # align volumes
-    
+        # align volumes.  preproc(referce, remaining)
+        processed = util.preproc_spgr_align_and_crop(self.file_list[0], 
+                                         self.file_list[1:],
+                                         self.crop_padding)
 
-        
-        
-        pass
+        #replace input file list with processed files. order is reference:rest
+        self.file_list = processed
+
 
     
     def run_preproc_b1mos(self, mos_args):
