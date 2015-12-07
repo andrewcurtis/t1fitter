@@ -379,21 +379,24 @@ class T1Fitter(HasTraits):
         # set up functions for optimizer
         t1model = model.T1Models()
 
-        self.model_func = t1model.spgr_flat
+        self.model_func = t1model.spgr
         self.model_deriv = t1model.spgr_deriv_mt
 
+
+        self.data.shape = (len(self.flips), -1)
         # init fitter with our params
         tfit = optim.T1FitNLLSReg(self)
 
         #make x0
 
-        x0 = None
+        x0 = []
 
         if self.start_mode == 'vfa':
             x0 = self.fit.copy()
         else:
         #if self.start_mode == 'zero':
             x0 = np.zeros(self.volshape + [2])
+
 
         self.fit = tfit.run_fit( x0 )
 

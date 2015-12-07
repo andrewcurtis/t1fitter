@@ -34,6 +34,10 @@ class T1Models(object):
 
     @staticmethod
     def spgr(flips, m, t1, b1, tr):
+        b1.shape = (1,-1)
+        flips.shape = (-1,1)
+        m.shape = (1,-1)
+        t1.shape= (1,-1)
 
         ca = ne.evaluate('cos(b1*flips)')
         sa = ne.evaluate('sin(b1*flips)')
@@ -50,6 +54,10 @@ class T1Models(object):
 
     @staticmethod
     def spgr_deriv_mt(flips, m, t1, b1, tr):
+        b1.shape = (1,-1)
+        flips.shape = (-1,1)
+        m.shape = (1,-1)
+        t1.shape= (1,-1)
 
         e1 = ne.evaluate('exp(-tr/t1)')
         e1p = ne.evaluate('exp(tr/t1)')
@@ -63,7 +71,11 @@ class T1Models(object):
 
     @staticmethod
     def spgr_deriv_m(flips, m, t1, b1, tr):
-
+        b1.shape = (1,-1)
+        flips.shape = (-1,1)
+        m.shape = (1,-1)
+        t1.shape= (1,-1)
+        
         e1 = ne.evaluate('exp(-tr/t1)')
         e1p = ne.evaluate('exp(tr/t1)')
         ca = ne.evaluate('cos(b1*flips)')

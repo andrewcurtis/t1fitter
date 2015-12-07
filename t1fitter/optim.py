@@ -53,11 +53,14 @@ class T1FitNLLSReg(T1Fit):
         # might change for really large data?
         sim = self.params.model_func(x[:,0], x[:,1],
                                 self.params.flips,
-                                self.params.b1map[self.mask_flat],
+                                self.b1[self.mask_flat],
                                 self.params.trs)
 
         # try: replace with numexpr
-        retval = 0.5 * np.sum( ((self.params.data - sim) * self.params.mask)**2 )
+        print(self.params.data.shape)
+        print(sim.shape)
+
+        retval = 0.5 * np.sum( ((self.params.data[:,self.mask_flat] - sim))**2 )
 
 
         if self.params.l1_lam > 0:
@@ -103,7 +106,7 @@ class T1FitNLLSReg(T1Fit):
 
         sim = self.params.model_func(x[:,0], x[:,1],
                                 self.params.flips,
-                                self.params.b1map[self.mask_flat],
+                                self.b1[self.mask_flat],
                                 self.params.trs)
 
         #flipvols X vox
@@ -112,7 +115,7 @@ class T1FitNLLSReg(T1Fit):
         # pars X flipvosl X vox
         deriv = self.params.model_deriv(x[:,0], x[:,1],
                                  self.params.flips,
-                                 self.params.b1map[self.mask_flat],
+                                 self.b1[self.mask_flat],
                                  self.params.trs)
 
         # TODO: how to mult in mask? need to avoid transpose, fix model deriv shape
@@ -134,14 +137,21 @@ class T1FitNLLSReg(T1Fit):
         self.grad_scratch = np.zeros_like(x0)
 
         #extract inner region so optimization domain is smaller
-        self.mask_flat = self.to_flat(self.params.mask.copy())>0
+        #make logical mask
+        self.mask_flat = self.params.mask.copy().ravel() > 0
 
-        self.x0 = x0.copy()
-        self.to_flat(self.x0)
-        self.x0 = self.x0[self.mask_flat,:]
+
+        self.to_flat(x0)
+        self.x0 = x0[self.mask_flat,:]
+
+        print('selfx0: {}'.format(self.x0.shape))
+        print('x0: {}'.format(x0.shape))
+
+        self.b1 = self.params.b1map.copy().ravel()
+
         #flatten
         nx = self.x0.shape[0]
-        bnds = np.zeros((nx, 2))
+        bnds = np.zeros((2*nx, 2))
 
         #mo
         bnds[::2,0] = 0.001
