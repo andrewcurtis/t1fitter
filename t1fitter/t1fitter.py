@@ -336,8 +336,10 @@ class T1Fitter(HasTraits):
 
         self.vfa_fit()
 
-        mean_m0 = np.mean(self.fit[...,0][self.mask])
-        mean_t1 = np.mean(self.fit[...,1][self.mask])
+        tmp = self.fit[...,0]
+        mean_m0 = np.mean(tmp[ self.mask>0].ravel())
+        tmp = self.fit[...,1]
+        mean_t1 = np.mean(tmp[ self.mask>0].ravel())
 
         datascale = mean_m0 / mean_t1
 
@@ -363,25 +365,37 @@ class T1Fitter(HasTraits):
                 self.prior.shape=(-1,2)
                 self.prior = self.prior[tmp_mask>0,:]
 
-                regl = regularization.TikohnovDiffReg3D(self.prior)
+                regl = regularization.TikhonovDiffReg3D(self.prior)
             else:
-                regl = regularization.TikohnovReg3D()
+                regl = regularization.TikhonovReg3D()
 
 
             self.l2reg = regl
 
         if self.l1_lam > 0:
-            self.hubreg = regularization.ParallelHuber2ClassReg3D(self.datashape,
-                                                        hub_scale=self.hub_scale,
-                                                        kern_sz=self.kernel_sz)
+            self.hubreg = regularization.ParallelHuber2ClassReg3D(self.volshape + [2],
+                                                        hub_scale=self.huber_scale,
+                                                        kern_radius=self.kern_sz)
         # set up functions for optimizer
-        self.model_func = model.spgr_flat
-        self.model_deriv = model.spgr_deriv_mt
+        t1model = model.T1Models()
+
+        self.model_func = t1model.spgr_flat
+        self.model_deriv = t1model.spgr_deriv_mt
 
         # init fitter with our params
         tfit = optim.T1FitNLLSReg(self)
 
-        self.fit = tfit.run_fit(self.flips, self.data, self.trs, self.b1map )
+        #make x0
+
+        x0 = None
+
+        if self.start_mode == 'vfa':
+            x0 = self.fit.copy()
+        else:
+        #if self.start_mode == 'zero':
+            x0 = np.zeros(self.volshape + [2])
+
+        self.fit = tfit.run_fit( x0 )
 
 
 

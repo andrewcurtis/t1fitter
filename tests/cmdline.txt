@@ -1,0 +1,33 @@
+python t1fitter.py --addvol /ResearchData/mr_research/andrew/t1_data/hires_dec03/fa14.nii.gz 10.0 14.0 \
+  --addvol /ResearchData/mr_research/andrew/t1_data/hires_dec03/fa3.nii.gz 10.0 3.0 \
+  --out /ResearchData/mr_research/andrew/t1_data/hires_dec03/fits/ \
+  --l1 --l1lam 1e-3 --l2 --l2lam 1e-3 --kern_radius 1 --verbose --debug \
+  --mosvol /ResearchData/mr_research/andrew/t1_data/hires_dec03/fa130.nii.gz 130.0 \
+  --mosvol /ResearchData/mr_research/andrew/t1_data/hires_dec03/fa150.nii.gz 150.0
+
+
+>>>>>
+
+Namespace(addnoise=-1, addvol=[['/ResearchData/mr_research/andrew/t1_data/hires_dec03/fa14.nii.gz', '10.0', '14.0'], ['/ResearchData/mr_research/andrew/t1_data/hires_dec03/fa3.nii.gz', '10.0', '3.0']], b1vol=None, crop_padding=4, debug=True, fit_method='vfa', huber_scale=3.0, kern_radius=1, l1=True, l1lam=0.001, l2=True, l2lam=0.001, l2mode='zero', maskvol=None, mosvol=[['/ResearchData/mr_research/andrew/t1_data/hires_dec03/fa130.nii.gz', '130.0'], ['/ResearchData/mr_research/andrew/t1_data/hires_dec03/fa150.nii.gz', '150.0']], out='/ResearchData/mr_research/andrew/t1_data/hires_dec03/fits/', preproc=True, smooth=25.0, startmode='zero', verbose=True)
+[t1fitter.py:256 -        init_from_cli() ] preprocessing selected, running
+[t1fitter.py:130 -          run_preproc() ] Preproc calling spgr_align_and_crop
+
+
+
+python t1fitter.py --addvol /ResearchData/mr_research/andrew/t1_data/hires_dec03/procfa14_bet_crop.nii.gz 14.0 10.0 \
+  --addvol /ResearchData/mr_research/andrew/t1_data/hires_dec03/procfa3_align_bet_crop.nii.gz 3.0 10.0 \
+  --out /ResearchData/mr_research/andrew/t1_data/hires_dec03/fits/ \
+  --l1 --l1lam 1e-3 --l2 --l2lam 1e-3 --kern_radius 1 --verbose --debug \
+  --b1vol  /ResearchData/mr_research/andrew/t1_data/hires_dec03/b1_mos.nii.gz \
+  --mask /ResearchData/mr_research/andrew/t1_data/hires_dec03/procfa14_bet_mask_crop.nii.gz
+
+
+
+
+
+python t1fitter.py --addvol /ResearchData/mr_research/andrew/t1_data/hires_dec03/procfa14_bet_crop.nii.gz 14.0 10.0 \
+  --addvol /ResearchData/mr_research/andrew/t1_data/hires_dec03/procfa3_align_bet_crop.nii.gz 3.0 10.0 \
+  --out /ResearchData/mr_research/andrew/t1_data/hires_dec03/fits/ \
+  --l1 --l1lam 1e-3 --l2 --l2lam 1e-3 --kern_radius 1 --verbose --debug \
+  --b1vol  /ResearchData/mr_research/andrew/t1_data/hires_dec03/b1_mos.nii.gz \
+  --mask /ResearchData/mr_research/andrew/t1_data/hires_dec03/procfa14_bet_mask_crop.nii.gz --startmode zero --l2mode zero --fit_method nlreg

@@ -53,8 +53,8 @@ class T1FitNLLSReg(T1Fit):
         # might change for really large data?
         sim = self.params.model_func(x[:,0], x[:,1],
                                 self.params.flips,
-                                self.params.b1,
-                                self.params.tr)
+                                self.params.b1map[self.mask_flat],
+                                self.params.trs)
 
         # try: replace with numexpr
         retval = 0.5 * np.sum( ((self.params.data - sim) * self.params.mask)**2 )
@@ -103,8 +103,8 @@ class T1FitNLLSReg(T1Fit):
 
         sim = self.params.model_func(x[:,0], x[:,1],
                                 self.params.flips,
-                                self.params.b1,
-                                self.params.tr)
+                                self.params.b1map[self.mask_flat],
+                                self.params.trs)
 
         #flipvols X vox
         l2diff = self.params.data[:,self.mask_flat] - sim
@@ -112,8 +112,8 @@ class T1FitNLLSReg(T1Fit):
         # pars X flipvosl X vox
         deriv = self.params.model_deriv(x[:,0], x[:,1],
                                  self.params.flips,
-                                 self.params.b1,
-                                 self.params.tr)
+                                 self.params.b1map[self.mask_flat],
+                                 self.params.trs)
 
         # TODO: how to mult in mask? need to avoid transpose, fix model deriv shape
         deriv = np.sum( - (l2diff[np.newaxis, :, :] * deriv) , axis=1)
@@ -128,15 +128,17 @@ class T1FitNLLSReg(T1Fit):
 
 
 
-    def run_fit(self):
+    def run_fit(self, x0):
 
-        self.scratch = np.zeros_like(self.params.x0)
-        self.grad_scratch = np.zeros_like(self.params.x0)
+        self.scratch = np.zeros_like(x0)
+        self.grad_scratch = np.zeros_like(x0)
 
         #extract inner region so optimization domain is smaller
-        self.mask_flat = self.to_flat(self.params.mask)>0
-        self.x0 = self.to_flat(self.params.x0)[self.mask_flat,:]
+        self.mask_flat = self.to_flat(self.params.mask.copy())>0
 
+        self.x0 = x0.copy()
+        self.to_flat(self.x0)
+        self.x0 = self.x0[self.mask_flat,:]
         #flatten
         nx = self.x0.shape[0]
         bnds = np.zeros((nx, 2))
@@ -152,9 +154,9 @@ class T1FitNLLSReg(T1Fit):
         # ravel for optimizer
         self.x0.shape=(-1)
 
-        res = minimize(fun = self.objective, x0=self.x0, args = self.params,
+        res = minimize(fun = self.objective, x0=self.x0,
                         method='L-BFGS-B', jac = self.gradient, bounds = bnds,
-                        options={'maxcor':self.params.maxcor, 'ftol':self.params.ftol})
+                        options={'maxcor':self.params.maxcor, 'ftol':self.params.fit_tol})
 
         return res
 

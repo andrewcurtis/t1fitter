@@ -32,8 +32,9 @@ class Regularizer3D(HasTraits):
 
     """
 
-    def __init__(self):
-        super(self).__init__()
+    def __init__(self, nthreads=4):
+        ne.set_num_threads(nthreads)
+
 
     def reg_func(self, x):
         return ne.evaluate('sum(x**2)')
@@ -46,16 +47,16 @@ class Regularizer3D(HasTraits):
 TikhonovReg3D = Regularizer3D
 
 
-class TikohnovDiffReg3D(Regularizer3D):
+class TikhonovDiffReg3D(Regularizer3D):
     """ Similar to basic L2 regularizer, but with distance from prior.
 
     """
 
     x0 = Array
 
-    def __init__(self, x0):
-        super(self).__init__()
+    def __init__(self, x0, nthreads=4):
         self.x0 = x0
+        ne.set_num_threads(nthreads)
 
     def reg_func(self, x):
         return ne.evaluate('sum((x - self.x0)**2)')
@@ -77,7 +78,7 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
     kern_weights = Array
     hub_scale = CFloat(3.0)
 
-    def __init__(self, img_sz, nthreads=4, kern_radius=1, hub_scale=1.0):
+    def __init__(self, img_sz, nthreads=4, kern_radius=1, hub_scale=3.0):
         self.nthreads = nthreads
         self.scratch = np.zeros(img_sz)
         self.kern_sz = kern_radius
