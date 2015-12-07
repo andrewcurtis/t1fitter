@@ -71,17 +71,17 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
     Classes are assumed to be interleaved (e.g. datashape is (nz, ny, nx, 2))
 
     """
-    
+
     scratch = Array
     kern_sz = Int
     kern_weights = Array
-    huber_scale = CFloat
+    hub_scale = CFloat(3.0)
 
-    def __init__(self, img_sz, nthreads=4, kern_radius=1, huber_scale=1.0):
+    def __init__(self, img_sz, nthreads=4, kern_radius=1, hub_scale=1.0):
         self.nthreads = nthreads
         self.scratch = np.zeros(img_sz)
         self.kern_sz = kern_radius
-        self.huber_scale = huber_scale
+        self.hub_scale = hub_scale
 
         if kern_radius == 1:
             self.init_kern1()
@@ -138,11 +138,11 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
     def init_reg(self):
         # JITTED version of huber penalty.
-        huber_sig = void(double[:,:,:,:], double[:], int64, double[:], int64, int64, int64)
+        huber_sig = void(double[:,:,:,:], double[:], int64, double, double[:], int64, int64, int64)
         huber_jitted = jit(huber_sig, nopython=True)(self.huber3d)
 
         # JITTED version of huber gradient.
-        ghuber_sig = void(double[:,:,:,:], double[:], int64, double[:,:,:,:], int64, int64)
+        ghuber_sig = void(double[:,:,:,:], double[:], int64, double, double[:,:,:,:], int64, int64)
         ghuber_jitted = jit(ghuber_sig, nopython=True)(self.ghuber3d)
 
         '''
@@ -153,12 +153,12 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
 
     def reg_func(self, x):
-        return self.multi_huber(x, self.kern_weights, self.kern_sz)
+        return self.multi_huber(x, self.kern_weights, self.kern_sz, self.hub_scale)
 
 
     def reg_deriv(self, x, inout):
         self.scratch *= 0.0;
-        self.multi_ghuber(x, self.kern_weights, self.kern_sz, self.scratch)
+        self.multi_ghuber(x, self.kern_weights, self.kern_sz, self.hub_scale, self.scratch)
         return self.scratch
 
 
@@ -254,7 +254,7 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
 
     @staticmethod
-    def ghuber3d(imgs, weights, kernel_sz, delta,  output, start, stop):
+    def ghuber3d(imgs, weights, kernel_sz, delta, output, start, stop):
         threadstate = savethread()
         n_slices, n_rows, n_cols, n_channels = imgs.shape
         max_sz = weights.shape[0]
@@ -344,9 +344,10 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
 class Huber2ClassReg3D(Regularizer3D):
     """ Implements a single threaded version of huber regularizer for testing """
-    
+
     scratch = Array
     kern_sz = Int
+    hub_scale = CFloat(3.0)
     kern_weights = Array
 
     def __init__(self, img_sz, kern_radius=1 ):
@@ -363,12 +364,12 @@ class Huber2ClassReg3D(Regularizer3D):
 
 
     def reg_func(self, x):
-        return self.huber_single(x, self.kern_weights, self.kern_sz)
+        return self.huber_single(x, self.kern_weights, self.kern_sz, self.hub_scale)
 
 
     def reg_deriv(self, x, inout):
         self.scratch *= 0.0;
-        self.ghuber_single(x, self.kern_weights, self.kern_sz, self.scratch)
+        self.ghuber_single(x, self.kern_weights, self.kern_sz, self.hub_scale, self.scratch)
         return self.scratch
 
 
@@ -416,7 +417,7 @@ class Huber2ClassReg3D(Regularizer3D):
 
     @staticmethod
     @autojit(nopython=True)
-    def huber_single(imgs, weights, kernel_sz):
+    def huber_single(imgs, weights, kernel_sz, delta):
         n_slices, n_rows, n_cols, n_channels = imgs.shape
         max_sz = weights.shape[0]
 
@@ -451,17 +452,17 @@ class Huber2ClassReg3D(Regularizer3D):
 
                                 tmp = 0
 
-                                if zsq < 1.0:
+                                if zsq < delta:
                                     tmp = 0.5*zsq
                                 else:
-                                    tmp = np.sqrt(zsq)-0.5
+                                     tmp = delta*(np.sqrt(zsq)-0.5*delta)
 
                                 accum += tmp * w
         return accum
 
     @staticmethod
     @autojit(nopython=True)
-    def ghuber_single(imgs, weights, kernel_sz, output ):
+    def ghuber_single(imgs, weights, kernel_sz, delta, output ):
         n_slices, n_rows, n_cols, n_channels = imgs.shape
         max_sz = weights.shape[0]
 
@@ -503,8 +504,8 @@ class Huber2ClassReg3D(Regularizer3D):
 
                                 rsq = 0.0
 
-                                if z >= 1.0:
-                                    rsq = 1.0/z
+                                if z >= delta:
+                                    rsq = delta/z
                                     w *= rsq
 
                                 output[ss, rr, cc, 0] += w*diffs1
