@@ -104,7 +104,7 @@ class T1FitNLLSReg(T1Fit):
 
             self.scratch *= 0.0;
             self.to_flat(self.scratch)
-            self.log.info('x shape: {}'.format(x.shape))
+            self.log.debug('x shape: {}'.format(x.shape))
             self.log.debug('scratch shape: {}'.format(self.scratch.shape))
             self.scratch[self.mask_flat,:] = x[:,:]
             self.to_vol(self.scratch)
@@ -115,7 +115,7 @@ class T1FitNLLSReg(T1Fit):
             self.params.hubreg.reg_deriv(self.scratch, self.grad_scratch)
             self.to_flat(self.grad_scratch)
 
-            tmp =  2.0*self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
+            tmp =  1.0*self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
             self.log.info('l1 grad norm: {}'.format(np.sum(tmp**2)))
 
             self.grad -= tmp
@@ -195,9 +195,13 @@ class T1FitNLLSReg(T1Fit):
 
         res = minimize(fun = self.objective, x0=self.x0,
                         method='L-BFGS-B', jac = self.gradient, bounds = bnds,
-                        options={'maxcor':self.params.maxcor, 'ftol':self.params.fit_tol})
+                        options={'maxcor':self.params.maxcor, 'ftol':self.params.fit_tol,
+                                 'maxiter':self.params.maxiter, 'maxfun':self.params.maxfun})
 
         self.log.info('results : {}'.format(res))
+
+        if res.success is not True:
+            self.log.error('Fitting error! {}'.format(res))
 
         tmp = res.x
         tmp.shape=(-1,2)

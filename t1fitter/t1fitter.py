@@ -55,6 +55,8 @@ class T1Fitter(HasTraits):
     #params for BFGS
     fit_tol = Float(1e-5)
     maxcor = Int(25)
+    maxiter = Int(500)
+    maxfun = Int(2000)
 
     #remember affine matrix for output
     base_image_affine = Array
@@ -282,7 +284,7 @@ class T1Fitter(HasTraits):
                 self.log.info('B1 MOS data found, processing.')
                 self.run_preproc_b1mos(args.mosvol)
                 new_cli = new_cli + ' --b1vol {} '.format(self.b1vol)
-                
+
 
         self.check_data_sizes()
 
@@ -338,10 +340,11 @@ class T1Fitter(HasTraits):
 
 
 
-    def nlreg_fit(self):
+    def nlreg_fit(self, prep_only=False):
 
         # TODO: run vfa fit to find m0, in order to scale data properly.
         # want mean(t1) ~ mean(m0)
+
 
         self.vfa_fit()
 
@@ -394,7 +397,7 @@ class T1Fitter(HasTraits):
 
         self.data.shape = (len(self.flips), -1)
         # init fitter with our params
-        tfit = optim.T1FitNLLSReg(self)
+        self.tfit = optim.T1FitNLLSReg(self)
 
         #make x0
 
@@ -408,7 +411,8 @@ class T1Fitter(HasTraits):
             x0 = np.zeros(self.volshape + [2])
 
 
-        self.fit = tfit.run_fit( x0 ).reshape(self.volshape + [2])
+        if not prep_only:
+            self.fit = self.tfit.run_fit( x0 ).reshape(self.volshape + [2])
 
 
 
