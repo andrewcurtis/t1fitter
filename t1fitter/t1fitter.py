@@ -33,13 +33,13 @@ class T1Fitter(HasTraits):
     trs = Array
     flips = Array
 
-    outname = String
+    outpath = String
 
     #data
     b1map = Array
     data = Array
     mask = Array
-    fit = Array
+    #fit = Array
     prior = Array
 
     volshape = List
@@ -108,17 +108,17 @@ class T1Fitter(HasTraits):
     def save_fit_results(self):
 
 
-        fname = os.path.join(self.outname, 'm0_{}.nii.gz'.format(self.fit_method))
+        fname = os.path.join(self.outpath, 'm0_{}.nii.gz'.format(self.fit_method))
         self.log.info('Saving M0 volume to {}'.format(fname))
         self.write_nifti(self.fit[...,0], fname)
 
-        fname = os.path.join(self.outname, 't1_{}.nii.gz'.format(self.fit_method))
+        fname = os.path.join(self.outpath, 't1_{}.nii.gz'.format(self.fit_method))
         self.log.info('Saving T1 volume to {}'.format(fname))
         self.write_nifti(self.fit[...,1], fname)
 
         # did we also fit for b1+ ?
         if self.fit.shape[-1] > 2:
-            fname = os.path.join(self.outname, 'b1_{}.nii.gz'.format(self.fit_method))
+            fname = os.path.join(self.outpath, 'b1_{}.nii.gz'.format(self.fit_method))
             self.log.info('Saving B1 volume to {}'.format(fname))
             self.write_nifti(self.fit[...,2], fname)
 
@@ -132,7 +132,8 @@ class T1Fitter(HasTraits):
         # align volumes.  preproc(referce, remaining)
         processed, mask, cliplims = util.preproc_spgr_align_and_crop(self.file_list[0],
                                          self.file_list[1:],
-                                         self.crop_padding)
+                                         self.crop_padding,
+                                         outpath = self.outpath)
 
         #replace input file list with processed files. order is reference:rest
         self.file_list_orig = self.file_list
@@ -157,7 +158,7 @@ class T1Fitter(HasTraits):
         flips = map(float, [mos_args[0][1], mos_args[1][1]])
 
         self.b1vol = util.preproc_b1mos(self.file_list_orig[0], self.mask_path,
-                    self.clip_lims, in_vols, flips)
+                    self.clip_lims, in_vols, flips, outpath=self.outpath)
 
         self.log.info('B1MOS map saved to: {}... Loading.'.format(self.b1vol))
 
@@ -210,14 +211,11 @@ class T1Fitter(HasTraits):
 
         self.log.info('Parsing CLI: {}'.format(args))
 
+        new_cli = ''
+
         self.l1_lam = args.l1lam
         self.l2_lam = args.l2lam
 
-        if args.l1 == False:
-            self.l1_lam = 0.0
-
-        if args.l2 == False:
-            self.l2_lam = 0.0
 
         self.l2_mode = args.l2mode
 
@@ -229,7 +227,7 @@ class T1Fitter(HasTraits):
         self.fit_method = args.fit_method
         self.smooth_fac = args.smooth
 
-        self.outname = args.out
+        self.outpath = args.out
 
         if args.verbose:
             self.log.setLevel(logging.INFO)
@@ -260,6 +258,11 @@ class T1Fitter(HasTraits):
             self.log.info('preprocessing selected, running')
             self.run_preproc()
 
+            for j, fname in enumerate(self.file_list):
+                new_cli = new_cli + ' --addvol {} {} {} '.format(fname, self.flips[j]*180.0/np.pi, self.trs[j] *1e3)
+
+            new_cli = new_cli + ' --mask {} '.format(self.mask_path)
+
         # preprocessing will change file_list entries, so load after.
         self.load_vols(self.data, self.file_list)
 
@@ -278,8 +281,14 @@ class T1Fitter(HasTraits):
             if args.mosvol is not None:
                 self.log.info('B1 MOS data found, processing.')
                 self.run_preproc_b1mos(args.mosvol)
+                new_cli = new_cli + ' --b1vol {} '.format(self.b1vol)
+                
 
         self.check_data_sizes()
+
+        if len(new_cli) > 0:
+            print('Processing changed files. If you want to rerun the fitting with different arguments, please use the following command line options:')
+            print(new_cli)
 
 
     def make_smooth_vfa(self):
@@ -304,10 +313,10 @@ class T1Fitter(HasTraits):
 
         if self.debug:
             self.log.debug('Saving smoothed prior volume.')
-            fname = os.path.join(self.outname, 'm0_prior_smooth.nii.gz')
+            fname = os.path.join(self.outpath, 'm0_prior_smooth.nii.gz')
             self.write_nifti(self.fit[...,0], fname)
 
-            fname = os.path.join(self.outname, 't1_prior_smooth.nii.gz')
+            fname = os.path.join(self.outpath, 't1_prior_smooth.nii.gz')
             self.write_nifti(self.fit[...,1], fname)
 
 
@@ -454,20 +463,16 @@ def t1fit_cli():
 
     #fitting options
 
-    parser.add_argument('--l1', action='store_true',
-                        help='Enable Huber penalty. See  -l1lam to set penatly scaling. ')
     parser.add_argument('--l1lam', type=float, default=1e-3,
-                        help='l1 lambda: scaling factor for Huber penalty')
+                        help='l1 lambda: scaling factor for Huber penalty, 0 == disabled')
     parser.add_argument('--kern_radius', type=int, default=1,
                         help='Huber spatial kernel radius.')
     parser.add_argument('--huber_scale', type=float, default=3.0,
                         help='Huber spatial kernel radius.')
 
 
-    parser.add_argument('--l2', action='store_true',
-                        help='Enable l2 Tikhonov penalty. See  -l2lam to set penatly scaling. ')
-    parser.add_argument('--l2lam', type=float, default=1e-3,
-                        help='l2 lambda: scaling factor for Tikhonov penalty')
+    parser.add_argument('--l2lam', type=float, default=0.0,
+                        help='l2 lambda: scaling factor for Tikhonov penalty. 0 == disabled')
     parser.add_argument('--l2mode', choices=['zero','vfa','smooth_vfa'], default='zero',
                         help='l2 Tikhonov penalty mode -- Distance from smooth prior, or zero (normal Tik). ')
 

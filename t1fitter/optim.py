@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 import scipy
 import scipy.linalg
 from scipy.optimize import minimize
@@ -11,6 +12,7 @@ class T1Fit(HasTraits):
 
     def __init__(self, t1pars):
         self.params = t1pars
+        self.log = logging.getLogger('T1Fit')
 
     def init_model(self):
         pass
@@ -43,7 +45,10 @@ class T1FitNLLSReg(T1Fit):
     def objective(self, x):
 
         # reshape x to (flat , mo/t1)
+        self.log.info('x shape: {}'.format(x.shape))
         self.to_flat(x)
+        self.log.info('x shape: {}'.format(x.shape))
+
 
         # compute obj fun
         # Options here are to extract valid image region from mask and only compute on
@@ -57,51 +62,69 @@ class T1FitNLLSReg(T1Fit):
                                 self.params.trs)
 
         # try: replace with numexpr
-        print(self.params.data.shape)
-        print(sim.shape)
+        self.log.info('datashape: {}'.format(self.params.data.shape))
+        self.log.info('sim shape: {}'.format(sim.shape))
 
         retval = 0.5 * np.sum( ((self.params.data[:,self.mask_flat] - sim))**2 )
+        self.log.info('fit to data term: {}'.format(retval))
 
 
         if self.params.l1_lam > 0:
             self.to_flat(self.scratch)
+            self.scratch *= 0.0;
             self.scratch[self.mask_flat,:] = x
-            tmp = self.params.l1_lam * self.params.hubreg.reg_func(self.to_vol(self.scratch))
+            self.to_vol(self.scratch)
+            tmp = self.params.l1_lam * self.params.hubreg.reg_func(self.scratch)
+            self.log.info('l1 term: {}'.format(tmp))
             retval += tmp
 
         if self.params.l2_lam > 0:
             tmp = self.params.l2_lam * self.params.l2reg.reg_func(x)
+            self.log.info('l2 term: {}'.format(tmp))
             retval += tmp
 
         # ravel for optimizer
         x.shape = (-1)
 
+        return retval
+
 
     def gradient(self, x):
 
+        self.log.info('x shape: {}'.format(x.shape))
+        
         self.to_flat(x)
 
-        grad = np.zeros_like(x)
+        self.log.info('x shape: {}'.format(x.shape))
+       
+        self.grad *= 0
+        self.to_flat(self.grad)
+    
+        if self.params.l1_lam > 0:
 
-        self.scratch *= 0.0;
-        self.scratch[self.mask_flat,:] = x[:,:]
-        self.to_vol(self.scratch)
+            self.scratch *= 0.0;
+            self.to_flat(self.scratch)
+            self.log.info('x shape: {}'.format(x.shape))
+            self.log.info('scratch shape: {}'.format(self.scratch.shape))
+            self.scratch[self.mask_flat,:] = x[:,:]
+            self.to_vol(self.scratch)
 
-        self.grad_scratch *= 0.0;
-        self.to_vol(self.grad_scratch)
 
-
-        if self.parms.l1_lam > 0:
+            self.grad_scratch *= 0.0;
+            self.to_vol(self.grad_scratch)
             self.params.hubreg.reg_deriv(self.scratch, self.grad_scratch)
-
-            grad = -2.0*self.params.l1_lam * self.to_flat(self.grad_scratch)[self.mask_flat,:]
-
+            self.to_flat(self.grad_scratch)
 
 
-        if self.parms.l2_lam > 0:
+            self.grad += -2.0*self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
+
+
+
+        if self.params.l2_lam > 0:
             l2dif = self.params.l2reg.reg_deriv(x)
+            self.log.info('l2dif shape: {}'.format(l2dif.shape))
 
-            grad -= 2.0*self.params.l2_lam * l2dif
+            self.grad += self.params.l2_lam * l2dif
 
 
         sim = self.params.model_func(x[:,0], x[:,1],
@@ -111,6 +134,7 @@ class T1FitNLLSReg(T1Fit):
 
         #flipvols X vox
         l2diff = self.params.data[:,self.mask_flat] - sim
+        self.log.info('l2diff shape: {}'.format(l2diff.shape))
 
         # pars X flipvosl X vox
         deriv = self.params.model_deriv(x[:,0], x[:,1],
@@ -120,38 +144,41 @@ class T1FitNLLSReg(T1Fit):
 
         # TODO: how to mult in mask? need to avoid transpose, fix model deriv shape
         deriv = np.sum( - (l2diff[np.newaxis, :, :] * deriv) , axis=1)
+        self.log.info('deriv shape: {}'.format(deriv.shape))
 
         # vox X pars
-        grad += deriv[:,:].T
+        self.grad += deriv[:,:].T
 
+        # ravel for optimizer
+        x.shape = (-1)
 
-        grad.shape = (-1)
-
-        return grad
+        return self.grad.reshape(-1)
 
 
 
     def run_fit(self, x0):
 
-        self.scratch = np.zeros_like(x0)
-        self.grad_scratch = np.zeros_like(x0)
-
         #extract inner region so optimization domain is smaller
         #make logical mask
         self.mask_flat = self.params.mask.copy().ravel() > 0
 
-
         self.to_flat(x0)
-        self.x0 = x0[self.mask_flat,:]
+        self.x0 = x0[self.mask_flat,:].copy().reshape(-1)
+        #we only fit whats in the mask, so gradient is that size X num pars
+        self.grad = np.zeros_like(self.x0)
 
         print('selfx0: {}'.format(self.x0.shape))
         print('x0: {}'.format(x0.shape))
 
         self.b1 = self.params.b1map.copy().ravel()
 
+        if self.params.l1_lam > 0:
+            self.scratch = np.zeros_like(x0)
+            self.grad_scratch = np.zeros_like(x0)
+
         #flatten
         nx = self.x0.shape[0]
-        bnds = np.zeros((2*nx, 2))
+        bnds = np.zeros((nx, 2))
 
         #mo
         bnds[::2,0] = 0.001
@@ -161,14 +188,15 @@ class T1FitNLLSReg(T1Fit):
         bnds[1::2,1 ] = 10.0
 
 
-        # ravel for optimizer
-        self.x0.shape=(-1)
-
         res = minimize(fun = self.objective, x0=self.x0,
                         method='L-BFGS-B', jac = self.gradient, bounds = bnds,
                         options={'maxcor':self.params.maxcor, 'ftol':self.params.fit_tol})
 
-        return res
+        self.log.info('results : {}'.format(res))
+
+        tmp = res.x
+        self.to_vol(tmp)
+        return tmp
 
 
     def multisolve(self):

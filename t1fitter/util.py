@@ -69,7 +69,7 @@ def split_nifti_pathname(x):
     elif x.endswith('.nii'):
         return os.path.splitext(x)[0]
 
-def preproc_spgr_align_and_crop(ref_vol, other_vols, crop_edge=1, outprefix='proc', ext = '.nii.gz', skip=0):
+def preproc_spgr_align_and_crop(ref_vol, other_vols, crop_edge=1, outprefix='proc',outpath='', ext = '.nii.gz', skip=0):
     #align all to ref
 
     proc_vols = []
@@ -77,7 +77,7 @@ def preproc_spgr_align_and_crop(ref_vol, other_vols, crop_edge=1, outprefix='pro
         outname = split_nifti_pathname(fname)
         base, name = os.path.split(outname)
 
-        outname = os.path.join(base, outprefix + name + '_align')
+        outname = os.path.join(base, outpath, outprefix + name + '_align')
         proc_vols.append(outname)
         if skip < 1:
             sh.flirt('-dof','6','-in',fname,'-ref',ref_vol,'-out',outname,)
@@ -87,7 +87,7 @@ def preproc_spgr_align_and_crop(ref_vol, other_vols, crop_edge=1, outprefix='pro
     #bet on the ref vol then apply to other vols
     outname = split_nifti_pathname(ref_vol)
     base, name = os.path.split(outname)
-    outname = os.path.join(base, outprefix + name + '_bet')
+    outname = os.path.join(base,outpath, outprefix + name + '_bet')
     maskname = outname + '_mask'
     if skip < 2:
         sh.bet(ref_vol, outname, '-m','-f','0.4')
@@ -141,20 +141,20 @@ def preproc_spgr_align_and_crop(ref_vol, other_vols, crop_edge=1, outprefix='pro
 
 
 
-def preproc_b1mos(ref_vol, cropped_mask_vol, clip_lims, in_vols, flips, outprefix='mos', ext = '.nii.gz'):
+def preproc_b1mos(ref_vol, cropped_mask_vol, clip_lims, in_vols, flips, outprefix='mos',outpath='', ext = '.nii.gz'):
 
     #align first fa to ref
 
     fa1_align = split_nifti_pathname(in_vols[0])
     base, name = os.path.split(fa1_align)
-    fa1_align = os.path.join(base, outprefix + name + '_align')
+    fa1_align = os.path.join(base,outpath, outprefix + name + '_align')
 
     sh.flirt('-dof','7','-in',in_vols[0],'-ref',ref_vol,
                 '-out',fa1_align,'-omat','b1mos_to_ref.mat')
 
     fa2_align = split_nifti_pathname(in_vols[1])
     base, name = os.path.split(fa2_align)
-    fa2_align = os.path.join(base, outprefix + name + '_align')
+    fa2_align = os.path.join(base,outpath, outprefix + name + '_align')
 
     sh.flirt('-in',in_vols[1],'-ref',ref_vol,'-out',fa2_align,
             '-paddingsize',0.0,'-interp','trilinear',
@@ -206,7 +206,7 @@ def preproc_b1mos(ref_vol, cropped_mask_vol, clip_lims, in_vols, flips, outprefi
     scale = scale*mask
 
     tmp = nib.Nifti1Image( scale, affine )
-    b1map = os.path.join(base, 'b1_mos.nii.gz')
+    b1map = os.path.join(base, outpath, 'b1_mos.nii.gz')
     tmp.to_filename(b1map)
 
 

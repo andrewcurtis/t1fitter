@@ -33,11 +33,12 @@ class T1Models(object):
         ne.set_num_threads(nthreads)
 
     @staticmethod
-    def spgr(flips, m, t1, b1, tr):
+    def spgr(m, t1, flips, b1, tr):
         b1.shape = (1,-1)
         flips.shape = (-1,1)
         m.shape = (1,-1)
         t1.shape= (1,-1)
+        tr.shape= (-1,1)
 
         ca = ne.evaluate('cos(b1*flips)')
         sa = ne.evaluate('sin(b1*flips)')
@@ -48,16 +49,23 @@ class T1Models(object):
 
     # flatten SPGR into a single numexpr call to try and avoid intermediates
     @staticmethod
-    def spgr_flat(flips, m, t1, b1, tr):
-
-        return ne.evaluate('m * sin(b1*flips) * (1-exp(-tr/t1)) / (1-cos(b1*flips) * exp(-tr/t1))')
-
-    @staticmethod
-    def spgr_deriv_mt(flips, m, t1, b1, tr):
+    def spgr_flat(m, t1, flips, b1, tr):
         b1.shape = (1,-1)
         flips.shape = (-1,1)
         m.shape = (1,-1)
         t1.shape= (1,-1)
+        tr.shape= (-1,1)
+
+
+        return ne.evaluate('m * sin(b1*flips) * (1-exp(-tr/t1)) / (1-cos(b1*flips) * exp(-tr/t1))')
+
+    @staticmethod
+    def spgr_deriv_mt(m, t1, flips, b1, tr):
+        b1.shape = (1,-1)
+        flips.shape = (-1,1)
+        m.shape = (1,-1)
+        t1.shape= (1,-1)
+        tr.shape= (-1,1)
 
         e1 = ne.evaluate('exp(-tr/t1)')
         e1p = ne.evaluate('exp(tr/t1)')
@@ -70,7 +78,7 @@ class T1Models(object):
         return np.array([dm, dt1])
 
     @staticmethod
-    def spgr_deriv_m(flips, m, t1, b1, tr):
+    def spgr_deriv_m(m, t1, flips, b1, tr):
         b1.shape = (1,-1)
         flips.shape = (-1,1)
         m.shape = (1,-1)
@@ -86,7 +94,7 @@ class T1Models(object):
         return np.array([dm])
 
     @staticmethod
-    def spgr_deriv_t(flips, m, t1, b1, tr):
+    def spgr_deriv_t(m, t1, flips, b1, tr):
 
         e1 = ne.evaluate('exp(-tr/t1)')
         e1p = ne.evaluate('exp(tr/t1)')
@@ -99,7 +107,7 @@ class T1Models(object):
 
 
     @staticmethod
-    def spgr_deriv_mtb(flips, m, t1, b1, tr):
+    def spgr_deriv_mtb(m, t1, flips, b1, tr):
 
         e1 = ne.evaluate('exp(-tr/t1)')
         e1p = ne.evaluate('exp(tr/t1)')
