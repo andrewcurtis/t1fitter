@@ -59,10 +59,13 @@ class TikhonovDiffReg3D(Regularizer3D):
         ne.set_num_threads(nthreads)
 
     def reg_func(self, x):
-        return ne.evaluate('sum((x - self.x0)**2)')
+        #return ne.evaluate('sum((x - self.x0)**2)')
+        return np.sum((x - self.x0)**2)
+        
 
     def reg_deriv(self, x):
-        return ne.evaluate('2*(x-x0)')
+        #return ne.evaluate('2*(x-self.x0)')
+        return 2.0*(x-self.x0)
 
 
 

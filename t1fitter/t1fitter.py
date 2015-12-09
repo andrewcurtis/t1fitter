@@ -401,13 +401,14 @@ class T1Fitter(HasTraits):
         x0 = []
 
         if self.start_mode == 'vfa':
+            self.vfa_fit()
             x0 = self.fit.copy()
         else:
-        #if self.start_mode == 'zero':
+            #if self.start_mode == 'zero':
             x0 = np.zeros(self.volshape + [2])
 
 
-        self.fit = tfit.run_fit( x0 )
+        self.fit = tfit.run_fit( x0 ).reshape(self.volshape + [2])
 
 
 

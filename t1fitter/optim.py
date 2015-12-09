@@ -45,9 +45,9 @@ class T1FitNLLSReg(T1Fit):
     def objective(self, x):
 
         # reshape x to (flat , mo/t1)
-        self.log.info('x shape: {}'.format(x.shape))
+        self.log.debug('x shape: {}'.format(x.shape))
         self.to_flat(x)
-        self.log.info('x shape: {}'.format(x.shape))
+        self.log.debug('x shape: {}'.format(x.shape))
 
 
         # compute obj fun
@@ -62,8 +62,8 @@ class T1FitNLLSReg(T1Fit):
                                 self.params.trs)
 
         # try: replace with numexpr
-        self.log.info('datashape: {}'.format(self.params.data.shape))
-        self.log.info('sim shape: {}'.format(sim.shape))
+        self.log.debug('datashape: {}'.format(self.params.data.shape))
+        self.log.debug('sim shape: {}'.format(sim.shape))
 
         retval = 0.5 * np.sum( ((self.params.data[:,self.mask_flat] - sim))**2 )
         self.log.info('fit to data term: {}'.format(retval))
@@ -91,11 +91,11 @@ class T1FitNLLSReg(T1Fit):
 
     def gradient(self, x):
 
-        self.log.info('x shape: {}'.format(x.shape))
+        self.log.debug('x shape: {}'.format(x.shape))
         
         self.to_flat(x)
 
-        self.log.info('x shape: {}'.format(x.shape))
+        self.log.debug('x shape: {}'.format(x.shape))
        
         self.grad *= 0
         self.to_flat(self.grad)
@@ -116,13 +116,13 @@ class T1FitNLLSReg(T1Fit):
             self.to_flat(self.grad_scratch)
 
 
-            self.grad += -2.0*self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
+            self.grad -= 2.0*self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
 
 
 
         if self.params.l2_lam > 0:
             l2dif = self.params.l2reg.reg_deriv(x)
-            self.log.info('l2dif shape: {}'.format(l2dif.shape))
+            self.log.debug('l2dif shape: {}'.format(l2dif.shape))
 
             self.grad += self.params.l2_lam * l2dif
 
@@ -134,7 +134,7 @@ class T1FitNLLSReg(T1Fit):
 
         #flipvols X vox
         l2diff = self.params.data[:,self.mask_flat] - sim
-        self.log.info('l2diff shape: {}'.format(l2diff.shape))
+        self.log.debug('l2diff shape: {}'.format(l2diff.shape))
 
         # pars X flipvosl X vox
         deriv = self.params.model_deriv(x[:,0], x[:,1],
@@ -144,7 +144,7 @@ class T1FitNLLSReg(T1Fit):
 
         # TODO: how to mult in mask? need to avoid transpose, fix model deriv shape
         deriv = np.sum( - (l2diff[np.newaxis, :, :] * deriv) , axis=1)
-        self.log.info('deriv shape: {}'.format(deriv.shape))
+        self.log.debug('deriv shape: {}'.format(deriv.shape))
 
         # vox X pars
         self.grad += deriv[:,:].T
@@ -167,8 +167,6 @@ class T1FitNLLSReg(T1Fit):
         #we only fit whats in the mask, so gradient is that size X num pars
         self.grad = np.zeros_like(self.x0)
 
-        print('selfx0: {}'.format(self.x0.shape))
-        print('x0: {}'.format(x0.shape))
 
         self.b1 = self.params.b1map.copy().ravel()
 
@@ -195,8 +193,11 @@ class T1FitNLLSReg(T1Fit):
         self.log.info('results : {}'.format(res))
 
         tmp = res.x
-        self.to_vol(tmp)
-        return tmp
+        tmp.shape=(-1,2)
+
+        result = np.zeros_like(x0)
+        result[self.mask_flat,:] = tmp[:,:]
+        return result
 
 
     def multisolve(self):
