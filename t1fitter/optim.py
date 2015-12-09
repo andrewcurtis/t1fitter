@@ -92,20 +92,20 @@ class T1FitNLLSReg(T1Fit):
     def gradient(self, x):
 
         self.log.debug('x shape: {}'.format(x.shape))
-        
+
         self.to_flat(x)
 
         self.log.debug('x shape: {}'.format(x.shape))
-       
+
         self.grad *= 0
         self.to_flat(self.grad)
-    
+
         if self.params.l1_lam > 0:
 
             self.scratch *= 0.0;
             self.to_flat(self.scratch)
             self.log.info('x shape: {}'.format(x.shape))
-            self.log.info('scratch shape: {}'.format(self.scratch.shape))
+            self.log.debug('scratch shape: {}'.format(self.scratch.shape))
             self.scratch[self.mask_flat,:] = x[:,:]
             self.to_vol(self.scratch)
 
@@ -115,8 +115,10 @@ class T1FitNLLSReg(T1Fit):
             self.params.hubreg.reg_deriv(self.scratch, self.grad_scratch)
             self.to_flat(self.grad_scratch)
 
+            tmp =  2.0*self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
+            self.log.info('l1 grad norm: {}'.format(np.sum(tmp**2)))
 
-            self.grad -= 2.0*self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
+            self.grad -= tmp
 
 
 
@@ -124,7 +126,10 @@ class T1FitNLLSReg(T1Fit):
             l2dif = self.params.l2reg.reg_deriv(x)
             self.log.debug('l2dif shape: {}'.format(l2dif.shape))
 
-            self.grad += self.params.l2_lam * l2dif
+            tmp = self.params.l2_lam * l2dif
+            self.log.info('l2 grad norm: {}'.format(np.sum(tmp**2)))
+
+            self.grad += tmp
 
 
         sim = self.params.model_func(x[:,0], x[:,1],
@@ -145,6 +150,8 @@ class T1FitNLLSReg(T1Fit):
         # TODO: how to mult in mask? need to avoid transpose, fix model deriv shape
         deriv = np.sum( - (l2diff[np.newaxis, :, :] * deriv) , axis=1)
         self.log.debug('deriv shape: {}'.format(deriv.shape))
+
+        self.log.info('obj grad norm: {}'.format(np.sum(deriv**2)))
 
         # vox X pars
         self.grad += deriv[:,:].T

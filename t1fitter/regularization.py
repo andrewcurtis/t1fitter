@@ -8,7 +8,7 @@ driver routine should choose the appropriate one.
 """
 import numpy as np
 import numexpr as ne
-
+import logging
 import threading
 from ctypes import pythonapi, c_void_p
 
@@ -33,6 +33,7 @@ class Regularizer3D(HasTraits):
     """
 
     def __init__(self, nthreads=4):
+        self.log = logging.get_logger('T1Fit')
         ne.set_num_threads(nthreads)
 
 
@@ -59,13 +60,14 @@ class TikhonovDiffReg3D(Regularizer3D):
         ne.set_num_threads(nthreads)
 
     def reg_func(self, x):
-        #return ne.evaluate('sum((x - self.x0)**2)')
-        return np.sum((x - self.x0)**2)
-        
+        x0 = self.x0
+        return ne.evaluate('sum((x - x0)**2)')
+
 
     def reg_deriv(self, x):
-        #return ne.evaluate('2*(x-self.x0)')
-        return 2.0*(x-self.x0)
+        x0 = self.x0
+        grad = ne.evaluate('2*(x-x0)')
+        return grad
 
 
 
@@ -161,9 +163,7 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
 
     def reg_deriv(self, x, inout):
-        self.scratch *= 0.0;
-        self.multi_ghuber(x, self.kern_weights, self.kern_sz, self.hub_scale, self.scratch)
-        return self.scratch
+        self.multi_ghuber(x, self.kern_weights, self.kern_sz, self.hub_scale, inout)
 
 
     @staticmethod
