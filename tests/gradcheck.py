@@ -19,7 +19,7 @@ def main():
 
     sz = (10,10,8)
 
-    dat = np.zeros(sz + (2,))
+    dat = np.ones(sz + (2,))
 
     dat[:5,:,:,0] = 1.5
     dat[5:,:,:,0] = 2
@@ -31,19 +31,23 @@ def main():
 
     dat[:,:,:5,:] *= 2
 
+    dat = dat.transpose((3,0,1,2))
+
+
     b1 = np.ones(sz)
     mask = np.zeros_like(b1)
 
-    mask[2:-2,2:-2,2:-2] = 1
+    mask[1:-1,1:-1,1:-1] = 1
+
 
     fitter.data = dat
     fitter.mask = mask
     fitter.b1map = b1
     fitter.volshape = list(sz)
 
-    fitter.l1_lam = 0
+    fitter.l1_lam = 1
     fitter.kern_sz = 1
-    fitter.huber_scale = 0.25
+    fitter.huber_scale = 0.2
 
     fitter.l2_lam = 0
     fitter.outpath='.'
@@ -56,15 +60,30 @@ def main():
     fitter.trs = np.array([10.0, 10.0])*1e-3
 
 
-    fitter.nlreg_fit(prep_only=True)
+    x0 = fitter.nlreg_fit(prep_only=True)
 
     # get t1 optimizer instance once everything is prepped
     tfit = fitter.tfit
 
 
-    #check close to data
-    scipy.optimize.check_grad(tfit.objective, tfit.gradient, x0 = dat*0.9.ravel())
+    print (b1.shape)
+    print (mask.shape)
+    print np.sum(mask)
+    print (dat.shape)
+    print (x0.shape)
 
+    tfit.run_fit(x0, prep_only=True)
+
+    tfit.obj_scale = 0.0
+
+    print (np.sum(tfit.x0))
+
+    tfit.x0 += 1
+    print (np.sum(tfit.x0))
+
+    #check close to data
+    err = scipy.optimize.check_grad(tfit.objective, tfit.gradient, tfit.x0)
+    print(err)
 
 
 

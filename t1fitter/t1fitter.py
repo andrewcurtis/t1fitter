@@ -413,6 +413,8 @@ class T1Fitter(HasTraits):
 
         if not prep_only:
             self.fit = self.tfit.run_fit( x0 ).reshape(self.volshape + [2])
+        else:
+            return x0
 
 
 

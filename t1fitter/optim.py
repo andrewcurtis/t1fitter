@@ -13,6 +13,7 @@ class T1Fit(HasTraits):
     def __init__(self, t1pars):
         self.params = t1pars
         self.log = logging.getLogger('T1Fit')
+        self.obj_scale = 1.0
 
     def init_model(self):
         pass
@@ -42,6 +43,8 @@ class T1Fit(HasTraits):
 
 class T1FitNLLSReg(T1Fit):
 
+
+
     def objective(self, x):
 
         # reshape x to (flat , mo/t1)
@@ -65,7 +68,7 @@ class T1FitNLLSReg(T1Fit):
         self.log.debug('datashape: {}'.format(self.params.data.shape))
         self.log.debug('sim shape: {}'.format(sim.shape))
 
-        retval = 0.5 * np.sum( ((self.params.data[:,self.mask_flat] - sim))**2 )
+        retval = self.obj_scale * 0.5 * np.sum( ((self.params.data[:,self.mask_flat] - sim))**2 )
         self.log.info('fit to data term: {}'.format(retval))
 
 
@@ -115,7 +118,7 @@ class T1FitNLLSReg(T1Fit):
             self.params.hubreg.reg_deriv(self.scratch, self.grad_scratch)
             self.to_flat(self.grad_scratch)
 
-            tmp =  1.0*self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
+            tmp =  self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
             self.log.info('l1 grad norm: {}'.format(np.sum(tmp**2)))
 
             self.grad -= tmp
@@ -154,7 +157,7 @@ class T1FitNLLSReg(T1Fit):
         self.log.info('obj grad norm: {}'.format(np.sum(deriv**2)))
 
         # vox X pars
-        self.grad += deriv[:,:].T
+        self.grad += self.obj_scale * deriv[:,:].T
 
         # ravel for optimizer
         x.shape = (-1)
@@ -163,7 +166,7 @@ class T1FitNLLSReg(T1Fit):
 
 
 
-    def run_fit(self, x0):
+    def run_fit(self, x0, prep_only=False):
 
         #extract inner region so optimization domain is smaller
         #make logical mask
@@ -193,22 +196,24 @@ class T1FitNLLSReg(T1Fit):
         bnds[1::2,1 ] = 10.0
 
 
-        res = minimize(fun = self.objective, x0=self.x0,
-                        method='L-BFGS-B', jac = self.gradient, bounds = bnds,
-                        options={'maxcor':self.params.maxcor, 'ftol':self.params.fit_tol,
-                                 'maxiter':self.params.maxiter, 'maxfun':self.params.maxfun})
+        if not prep_only:
+            res = minimize(fun = self.objective, x0=self.x0,
+                            method='L-BFGS-B', jac = self.gradient, bounds = bnds,
+                            options={'maxcor':self.params.maxcor, 'ftol':self.params.fit_tol,
+                                     'maxiter':self.params.maxiter, 'maxfun':self.params.maxfun})
 
-        self.log.info('results : {}'.format(res))
+            self.log.info('results : {}'.format(res))
 
-        if res.success is not True:
-            self.log.error('Fitting error! {}'.format(res))
+            if res.success is not True:
+                self.log.error('Fitting error! {}'.format(res))
 
-        tmp = res.x
-        tmp.shape=(-1,2)
+            tmp = res.x
+            tmp.shape=(-1,2)
 
-        result = np.zeros_like(x0)
-        result[self.mask_flat,:] = tmp[:,:]
-        return result
+            result = np.zeros_like(x0)
+            result[self.mask_flat,:] = tmp[:,:]
+
+            return result
 
 
     def multisolve(self):
