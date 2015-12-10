@@ -77,12 +77,12 @@ class T1FitNLLSReg(T1Fit):
             self.scratch *= 0.0;
             self.scratch[self.mask_flat,:] = x
             self.to_vol(self.scratch)
-            tmp = self.params.l1_lam * self.params.hubreg.reg_func(self.scratch) 
+            tmp = self.params.l1_lam * self.params.hubreg.reg_func(self.scratch)
             self.log.info('l1 term: {}'.format(tmp))
             retval += tmp
 
         if self.params.l2_lam > 0:
-            tmp = self.params.l2_lam * self.params.l2reg.reg_func(x[:,1]) 
+            tmp = self.params.l2_lam * self.params.l2reg.reg_func(x[:,1])
             self.log.info('l2 term: {}'.format(tmp))
             retval += tmp
 
@@ -118,7 +118,7 @@ class T1FitNLLSReg(T1Fit):
             self.params.hubreg.reg_deriv(self.scratch, self.grad_scratch)
             self.to_flat(self.grad_scratch)
 
-            tmp =  self.params.l1_lam * self.grad_scratch[self.mask_flat,:] 
+            tmp =  self.params.l1_lam * self.grad_scratch[self.mask_flat,:]
             self.log.info('l1 grad norm: {}'.format(np.sqrt(np.sum(tmp**2))))
 
             self.grad -= tmp
@@ -129,7 +129,7 @@ class T1FitNLLSReg(T1Fit):
             l2dif = self.params.l2reg.reg_deriv(x[:,1])
             self.log.debug('l2dif shape: {}'.format(l2dif.shape))
 
-            tmp = self.params.l2_lam * l2dif        
+            tmp = self.params.l2_lam * l2dif
             self.log.info('l2 grad norm: {}'.format(np.sqrt(np.sum(tmp**2))))
 
             self.grad[:,1] += tmp

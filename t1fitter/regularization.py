@@ -205,8 +205,8 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
                                 w = weights[widx]
 
                                 tmp = 0
-
                                 z = sqrt(zsq)
+
                                 if z < delta:
                                     tmp = 0.5*zsq
                                 else:
@@ -280,8 +280,7 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
                         for hh in range(-kernel_sz, kernel_sz + 1):
                             for ww in range(-kernel_sz, kernel_sz + 1):
-                                zsq = 0
-                                diffs = 0
+                                zsq = 0.0
 
                                 widx = hh*hh+ww*ww+zz*zz
 
@@ -295,17 +294,15 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
                                 w = weights[widx]
 
-                                #sum over channels
-                                z = np.sqrt(zsq)
+                                z = sqrt(zsq)
 
-                                rsq = 0.0
-
+                                rval = 1.0
                                 if z >= delta:
-                                    rsq = delta/z
-                                    w *= rsq
+                                    rval = 0.5/z
 
-                                output[ss, rr, cc, 0] += w*diffs1
-                                output[ss, rr, cc, 1] += w*diffs2
+
+                                output[ss, rr, cc, 0] += rval*w*diffs1
+                                output[ss, rr, cc, 1] += rval*w*diffs2
 
         restorethread(threadstate)
 
@@ -348,15 +345,17 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 class Huber2ClassReg3D(Regularizer3D):
     """ Implements a single threaded version of huber regularizer for testing """
 
+
     scratch = Array
     kern_sz = Int
     hub_scale = CFloat(3.0)
     kern_weights = Array
 
-    def __init__(self, img_sz, kern_radius=1 ):
+    def __init__(self, img_sz, kern_radius=1, hub_scale =3.0 ):
 
         self.kern_sz = kern_radius
         self.scratch = np.zeros(img_sz)
+        self.hub_scale = hub_scale
 
         if kern_radius == 1:
             self.init_kern1()
@@ -371,9 +370,7 @@ class Huber2ClassReg3D(Regularizer3D):
 
 
     def reg_deriv(self, x, inout):
-        self.scratch *= 0.0;
-        self.ghuber_single(x, self.kern_weights, self.kern_sz, self.hub_scale, self.scratch)
-        return self.scratch
+        self.ghuber_single(x, self.kern_weights, self.kern_sz, self.hub_scale, inout)
 
 
 
@@ -445,20 +442,22 @@ class Huber2ClassReg3D(Regularizer3D):
                                 zsq = 0
 
                                 # explicit unroll turned out to be a lot faster
-                                diffs = imgvals[0] - lvals[0]
-                                zsq += diffs*diffs
+                                diffs1 = imgvals[0] - lvals[0]
+                                zsq += diffs1*diffs1
 
-                                diffs = imgvals[1] - lvals[1]
-                                zsq += diffs*diffs
+                                diffs2 = imgvals[1] - lvals[1]
+                                zsq += diffs2*diffs2
 
                                 w = weights[widx]
 
                                 tmp = 0
 
-                                if zsq < delta:
+                                z = sqrt(zsq)
+
+                                if z < delta:
                                     tmp = 0.5*zsq
                                 else:
-                                     tmp = delta*(np.sqrt(zsq)-0.5*delta)
+                                    tmp = delta*(z-0.5*delta)
 
                                 accum += tmp * w
         return accum
@@ -502,14 +501,12 @@ class Huber2ClassReg3D(Regularizer3D):
 
                                 w = weights[widx]
 
-                                #sum over channels
-                                z = np.sqrt(zsq)
+                                z = sqrt(zsq)
 
-                                rsq = 0.0
-
+                                rval = 1.0
                                 if z >= delta:
-                                    rsq = delta/z
-                                    w *= rsq
+                                    rval = 0.5/z
 
-                                output[ss, rr, cc, 0] += w*diffs1
-                                output[ss, rr, cc, 1] += w*diffs2
+
+                                output[ss, rr, cc, 0] += rval*w*diffs1
+                                output[ss, rr, cc, 1] += rval*w*diffs2
