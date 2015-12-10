@@ -11,7 +11,7 @@ import numpy as np
 
 
 
-def main():
+def checkgrad():
 
     fitter = t1fitter.T1Fitter()
 
@@ -45,13 +45,14 @@ def main():
     fitter.b1map = b1
     fitter.volshape = list(sz)
 
-    fitter.l1_lam = 1
+    fitter.l1_lam = 0
     fitter.kern_sz = 1
     fitter.huber_scale = 0.2
 
-    fitter.l2_lam = 0
+    fitter.l2_lam = 1
     fitter.outpath='.'
-    fitter.l2_mode = 'zero'
+    fitter.smooth=1
+    fitter.l2_mode = 'smooth_vfa'
     fitter.start_mode = 'zero'
     fitter.fit_method='nlreg'
 
@@ -89,4 +90,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    checkgrad()

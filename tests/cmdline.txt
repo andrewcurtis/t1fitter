@@ -34,13 +34,21 @@ python t1fitter.py --addvol /ResearchData/mr_research/andrew/t1_data/hires_dec03
 
 
 
+
 python t1fitter.py --addvol ~/proj/t1fit/oct9dat/fa14.nii.gz 14.0 10.6 --addvol ~/proj/t1fit/oct9dat/fa3.nii.gz 3.0 10.6 \
   --out ~/tmp/ --mosvol ~/proj/t1fit/oct9dat/fa130.nii.gz 130.0  --mosvol ~/proj/t1fit/oct9dat/fa150.nii.gz 150.0 \
   --l2lam 1e-3 --l1lam 0.0 --fit_method vfa --verbose --debug
 
 
+
+
 python t1fitter.py ddvol /home/acurtis/tmp/procfa14_bet_crop.nii.gz 14.0 10.6  --addvol /home/acurtis/tmp/procfa3_align_bet_crop.nii.gz 3.0 10.6  --mask /home/acurtis/tmp/procfa14_bet_mask_crop.nii.gz  --b1vol /home/acurtis/tmp/b1_mos.nii.gz \
   --out ~/tmp/ --verbose --l2lam 1e-3 --l1lam 0.0  --fit-method vfa
+
+
+
+python t1fitter.py --addvol /home/acurtis/tmp/procfa14_bet_crop.nii.gz 14.0 10.6  --addvol /home/acurtis/tmp/procfa3_align_bet_crop.nii.gz 3.0 10.6  --mask /home/acurtis/tmp/procfa14_bet_mask_crop.nii.gz  --b1vol /home/acurtis/tmp/b1_mos.nii.gz  --out ~/tmp/ --verbose --l1lam 1e-3 --kern_radius 1 --huber_scale 0.25 --l2lam 0 --fit_method nlreg --startmode zero --l2mode smooth_vfa  --smooth 10
+
 
 
 python t1fitter.py --addvol /ResearchData/mr_research/andrew/t1_data/hires_dec03/procfa14_bet_crop.nii.gz 14.0 10.0 \
@@ -49,5 +57,16 @@ python t1fitter.py --addvol /ResearchData/mr_research/andrew/t1_data/hires_dec03
    --verbose --debug \
   --b1vol  /ResearchData/mr_research/andrew/t1_data/hires_dec03/b1_mos.nii.gz \
   --mask /ResearchData/mr_research/andrew/t1_data/hires_dec03/procfa14_bet_mask_crop.nii.gz \
+  --kern_radius 1 --huber_scale 0.25 --fit_method nlreg --startmode zero --l2mode smooth_vfa  --smooth 20 \
+  --l1lam 1e-3 --l2lam 1e-5
+
+
+
+python t1fitter.py --addvol ~/t1fit/dec3dat/procfa14_bet_crop.nii.gz 14.0 10.0 \
+  --addvol ~/t1fit/dec3dat/procfa3_align_bet_crop.nii.gz 3.0 10.0 \
+  --out ~/tmp/ \
+   --verbose  \
+  --b1vol  ~/t1fit/dec3dat/b1_mos.nii.gz \
+  --mask ~/t1fit/dec3dat/procfa14_bet_mask_crop.nii.gz \
   --kern_radius 1 --huber_scale 0.25 --fit_method nlreg --startmode zero --l2mode smooth_vfa  --smooth 20 \
   --l1lam 1e-3 --l2lam 1e-5

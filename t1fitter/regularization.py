@@ -182,6 +182,13 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
                     lvals = imgs[ss, rr, cc, :]
 
                     # loop over kernel
+                    #TODO: look at cost of visiting all the locations where
+                    # weights are zero (e.g. corners of the domain)
+                    # Maybe accelerate via pre-computing the indices?
+                    # Surely checking weights isn't worth the cost of
+                    # all the branching
+                    #Alternativley, find bounds as a function of zpos and only check
+                    # in outermost loop
                     for zz in range(-kernel_sz, kernel_sz + 1):
                         for hh in range(-kernel_sz, kernel_sz + 1):
                             for ww in range(-kernel_sz, kernel_sz + 1):
@@ -193,9 +200,9 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
                                 # This used to be a loop over channels, but an
                                 # explicit unroll turned out to be a lot faster
-                                # I guess numba isn't doing the right thing
+                                # I guess numba isn't doing the right thing.
                                 # Sadly, this means we need different functions
-                                # if we go to more classes
+                                # specialized for # of channels
                                 diffs = imgvals[0] - lvals[0]
                                 zsq += diffs*diffs
 

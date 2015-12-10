@@ -192,10 +192,10 @@ class T1FitNLLSReg(T1Fit):
 
         #mo
         bnds[::2,0] = 0.001
-        bnds[::2,1 ] = 10.0
+        bnds[::2,1 ] = 20.0
         #t1
         bnds[1::2,0] = 0.01
-        bnds[1::2,1 ] = 10.0
+        bnds[1::2,1 ] = 8.0
 
 
         if not prep_only:
