@@ -53,10 +53,11 @@ class T1Fitter(HasTraits):
     #recriprocal huber cutoff
     huber_scale = Float(3.0)
     #params for BFGS
-    fit_tol = Float(1e-5)
-    maxcor = Int(25)
-    maxiter = Int(500)
-    maxfun = Int(2000)
+    fit_tol = Float(1e-6)
+    maxcor = Int(35)
+    maxiter = Int(800)
+    maxfun = Int(8000)
+    nthreads = Int(8)
 
     #remember affine matrix for output
     base_image_affine = Array
@@ -335,6 +336,11 @@ class T1Fitter(HasTraits):
 
         self.fit = tfit.vfa_fit(flips, data, trs[0], b1 )
         self.fit.shape = self.volshape + [2]
+
+        toobig = self.fit[...,1]>10.0
+        self.fit[toobig] = 10.0
+        self.fit[self.fit<0.0] = 0.0
+
         self.log.info('after vfa_fit, datasize is: {}'.format(self.data.shape))
         self.log.info('after vfa_fit, fit size is: {}'.format(self.fit.shape))
 
@@ -375,7 +381,7 @@ class T1Fitter(HasTraits):
                 tmp_mask.shape = (-1)
 
                 self.prior.shape=(-1,2)
-                self.prior = self.prior[tmp_mask>0,:]
+                self.prior = self.prior[tmp_mask>0,1]
 
                 regl = regularization.TikhonovDiffReg3D(self.prior)
             else:

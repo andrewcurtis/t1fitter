@@ -33,7 +33,7 @@ class Regularizer3D(HasTraits):
 
     """
 
-    def __init__(self, nthreads=4):
+    def __init__(self, nthreads=8):
         ne.set_num_threads(nthreads)
 
 
@@ -55,18 +55,16 @@ class TikhonovDiffReg3D(Regularizer3D):
 
     x0 = Array
 
-    def __init__(self, x0, nthreads=4):
-        self.x0 = x0
-        ne.set_num_threads(nthreads)
+    def __init__(self, x0, nthreads=8):
+        self.x0 = x0.copy()
+        #ne.set_num_threads(nthreads)
 
     def reg_func(self, x):
-        x0 = self.x0
-        return ne.evaluate('sum((x - x0)**2)')
+        return np.sqrt(np.sum((x - self.x0)**2))
 
 
     def reg_deriv(self, x):
-        x0 = self.x0
-        grad = ne.evaluate('2*(x-x0)')
+        grad = (x-self.x0)/np.sqrt(np.sum((x-self.x0)**2) )
         return grad
 
 
@@ -83,7 +81,7 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
     kern_weights = Array
     hub_scale = CFloat(3.0)
 
-    def __init__(self, img_sz, nthreads=4, kern_radius=1, hub_scale=3.0):
+    def __init__(self, img_sz, nthreads=8, kern_radius=1, hub_scale=3.0):
         self.nthreads = nthreads
         self.scratch = np.zeros(img_sz)
         self.kern_sz = kern_radius

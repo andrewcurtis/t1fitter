@@ -28,7 +28,7 @@ import numexpr as ne
 
 class T1Models(object):
     """docstring for T1Models"""
-    def __init__(self, nthreads=4):
+    def __init__(self, nthreads=8):
         super(T1Models, self).__init__()
         ne.set_num_threads(nthreads)
 
