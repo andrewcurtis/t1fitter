@@ -12,6 +12,7 @@ import logging
 import nibabel as nib
 import logging
 import os
+import sys
 
 import model
 import optim
@@ -56,10 +57,10 @@ class T1Fitter(HasTraits):
     #recriprocal huber cutoff
     huber_scale = Float(0.3)
     #params for BFGS
-    fit_tol = Float(1e-6)
+    fit_tol = Float(1e-5)
     maxcor = Int(15)
-    maxiter = Int(300)
-    maxfun = Int(3000)
+    maxiter = Int(100)
+    maxfun = Int(1000)
     nthreads = Int(4)
 
     #remember affine matrix for output
@@ -496,7 +497,7 @@ class T1Fitter(HasTraits):
 
 
 
-def t1fit_cli():
+def t1fit_cli(args):
 
     parser = argparse.ArgumentParser(description='T1fitter. VFA, eMOS, and NLReg, with optional preprocessing.')
 
@@ -567,15 +568,11 @@ def t1fit_cli():
                         help='Scale b1.')
 
 
-
-
-
-
     #simulation opions
     parser.add_argument('--addnoise', type=float, default=-1,
                         help='Add noise. Normaize input data to 1 and add this std() worth of noise.')
 
-    cmd_args = parser.parse_args()
+    cmd_args = parser.parse_args(args)
 
     print(cmd_args)
 
@@ -588,4 +585,4 @@ def t1fit_cli():
 
 
 if __name__ == '__main__':
-    t1fit_cli()
+    t1fit_cli(sys.argv[1:])

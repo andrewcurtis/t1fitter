@@ -71,7 +71,7 @@ class TikhonovDiffReg3D(Regularizer3D):
 
 class ParallelHuber2ClassReg3D(Regularizer3D):
     """
-    Two-class huber penalty. Huber l1/l2 crossover is at 1.0, so scale the data.
+    Two-class huber penalty. Huber l1/l2 crossover is at delta (huber_scale).
     Classes are assumed to be interleaved (e.g. datashape is (nz, ny, nx, 2))
 
     """
