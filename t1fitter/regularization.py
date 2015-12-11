@@ -119,6 +119,7 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
 
     def init_bi_tv_kern(self):
+        # Needs to be kern_sz^3 since we index with squared distance
         g = np.zeros(64)
         g[1] = 8.58513e-3;
         g[4] = 5.63861e-3;

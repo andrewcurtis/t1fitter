@@ -1,7 +1,9 @@
 import numpy as np
 import logging
 import scipy
+import os
 import scipy.linalg
+import nibabel as nib
 from scipy.optimize import minimize
 from traits.api import HasTraits, Float, List, Int, Array, Generic
 
@@ -10,10 +12,12 @@ class T1Fit(HasTraits):
     params = Generic
 
 
-    def __init__(self, t1pars):
+    def __init__(self, t1pars, debugpath=None):
         self.params = t1pars
         self.log = logging.getLogger('T1Fit')
         self.obj_scale = 1.0
+        self.itercount = 0
+        self.debugpath = debugpath
 
     def init_model(self):
         pass
@@ -47,10 +51,25 @@ class T1FitNLLSReg(T1Fit):
 
     def objective(self, x):
 
+        self.itercount += 1
+        self.log.debug('obj called iter {}'.format(self.itercount))
+
+
         # reshape x to (flat , mo/t1)
         self.log.debug('x shape: {}'.format(x.shape))
         self.to_flat(x)
         self.log.debug('x shape: {}'.format(x.shape))
+
+
+        if self.debugpath is not None:
+            if self.itercount % 10 == 0:
+                self.scratch *= 0.0;
+                self.to_flat(self.scratch)
+                self.scratch[self.mask_flat,:] = x
+                self.to_vol(self.scratch)
+                tmp = self.scratch[:,73,:,:]
+                scipy.misc.toimage(np.c_[tmp[:,:,0],tmp[:,:,1]],
+                        cmin=0.0, cmax=6.0).save(os.path.join(self.debugpath, 'iter{}.png'.format(self.itercount)))
 
 
         # compute obj fun

@@ -34,6 +34,8 @@ class T1Fitter(HasTraits):
     flips = Array
 
     outpath = String
+    outname = String
+    debugpath = String
 
     #data
     b1map = Array
@@ -54,10 +56,10 @@ class T1Fitter(HasTraits):
     huber_scale = Float(3.0)
     #params for BFGS
     fit_tol = Float(1e-6)
-    maxcor = Int(35)
-    maxiter = Int(800)
-    maxfun = Int(8000)
-    nthreads = Int(8)
+    maxcor = Int(15)
+    maxiter = Int(300)
+    maxfun = Int(3000)
+    nthreads = Int(4)
 
     #remember affine matrix for output
     base_image_affine = Array
@@ -111,17 +113,17 @@ class T1Fitter(HasTraits):
     def save_fit_results(self):
 
 
-        fname = os.path.join(self.outpath, 'm0_{}.nii.gz'.format(self.fit_method))
+        fname = os.path.join(self.outpath, 'm0_{}.nii.gz'.format(self.outname))
         self.log.info('Saving M0 volume to {}'.format(fname))
         self.write_nifti(self.fit[...,0], fname)
 
-        fname = os.path.join(self.outpath, 't1_{}.nii.gz'.format(self.fit_method))
+        fname = os.path.join(self.outpath, 't1_{}.nii.gz'.format(self.outname))
         self.log.info('Saving T1 volume to {}'.format(fname))
         self.write_nifti(self.fit[...,1], fname)
 
         # did we also fit for b1+ ?
         if self.fit.shape[-1] > 2:
-            fname = os.path.join(self.outpath, 'b1_{}.nii.gz'.format(self.fit_method))
+            fname = os.path.join(self.outpath, 'b1_{}.nii.gz'.format(self.outname))
             self.log.info('Saving B1 volume to {}'.format(fname))
             self.write_nifti(self.fit[...,2], fname)
 
@@ -216,6 +218,8 @@ class T1Fitter(HasTraits):
 
         new_cli = ''
 
+        self.nthreads = args.nthreads
+
         self.l1_lam = args.l1lam
         self.l2_lam = args.l2lam
 
@@ -288,9 +292,24 @@ class T1Fitter(HasTraits):
 
 
         self.check_data_sizes()
+        self.outname = self.fit_method
+
+        if args.descriptive_names:
+
+            if self.fit_method == 'nlreg':
+                if self.l1_lam > 0:
+                    self.outname = self.outname + '_l1{}_k{}_h{}'.format(self.l1_lam, self.kern_sz, self.huber_scale)
+                if self.l2_lam > 0:
+                    self.outname = self.outname + '_l2{}_s{}_m{}'.format(self.l2_lam, self.smooth, self.l2_mode)
+                self.outname = self.outname + '_sm{}_ftol{}_ncv{}'.format(self.startmode, self.fit_tol, self.maxcor)
+
+
+        if args.debug_image_path:
+            self.debugpath = args.debug_image_path
 
         if len(new_cli) > 0:
-            print('Processing changed files. If you want to rerun the fitting with different arguments, please use the following command line options:')
+            print('Processing changed files. If you want to rerun the fitting ' +
+                 ' with different arguments, please use the following command line options:')
             print(new_cli)
 
 
@@ -303,6 +322,8 @@ class T1Fitter(HasTraits):
         data = self.data[takeflips,...].copy()
 
         self.log.info('Smoothing data by {}'.format(self.smooth_fac))
+
+        data.shape = [2] + self.volshape
         data[0,...] = util.filt3d(data[0,...], self.smooth_fac)
         data[1,...] = util.filt3d(data[1,...], self.smooth_fac)
 
@@ -393,24 +414,28 @@ class T1Fitter(HasTraits):
         if self.l1_lam > 0:
             self.hubreg = regularization.ParallelHuber2ClassReg3D(self.volshape + [2],
                                                         hub_scale=self.huber_scale,
-                                                        kern_radius=self.kern_sz)
+                                                        kern_radius=self.kern_sz,
+                                                        nthreads=self.nthreads)
         # set up functions for optimizer
-        t1model = model.T1Models()
+        t1model = model.T1Models(nthreads=self.nthreads)
 
-        self.model_func = t1model.spgr
+        self.model_func = t1model.spgr_flat
         self.model_deriv = t1model.spgr_deriv_mt
 
 
-        self.data.shape = (len(self.flips), -1)
-        # init fitter with our params
-        self.tfit = optim.T1FitNLLSReg(self)
 
         #make x0
+        self.data.shape = (len(self.flips), -1)
+        # init fitter with our params
+        self.tfit = optim.T1FitNLLSReg(self, debugpath=self.debugpath)
 
         x0 = []
 
         if self.start_mode == 'vfa':
             self.vfa_fit()
+            x0 = self.fit.copy()
+        elif self.start_mode == 'smooth_vfa':
+            self.make_smooth_vfa()
             x0 = self.fit.copy()
         else:
             #if self.start_mode == 'zero':
@@ -448,57 +473,72 @@ def t1fit_cli():
 
     parser = argparse.ArgumentParser(description='T1fitter. VFA, eMOS, and NLReg, with optional preprocessing.')
 
-    parser.add_argument('--addvol', '-a', nargs=3,  action='append', metavar=('vol','flip','tr'), required=True,
+    basic_group = parser.add_argument_group('Main Arguments')
+    basic_group.add_argument('--addvol', '-a', nargs=3,  action='append', metavar=('vol','flip','tr'), required=True,
                         help='Add volume for fitting with flip angle (deg) and tr (ms)')
 
-    parser.add_argument('--out', '-o', default='t1fit',
+    basic_group.add_argument('--out', '-o', default='t1fit',
                         help='Output volume base name for t1 and m0 fit.')
 
-    parser.add_argument('--preproc', action="store_true",
-                        help='Run preprocessing on input volumes (alignment, brain extraction, cropping).')
-
-    parser.add_argument('--crop_padding', type=int, default=6,
-                        help='Edge padding for minimum volume crop size.')
-
-    parser.add_argument('--maskvol',
+    extravols_group = parser.add_argument_group('Additional Volumes')
+    extravols_group.add_argument('--maskvol',
                         help='Brain mask volume (must be provided if no preprocessing is used).')
 
-    parser.add_argument('--b1vol',
+    extravols_group.add_argument('--b1vol',
                         help='Pre calculated B1 map (as relative scaling of base FAs).')
 
-    parser.add_argument('--smooth', type=float, default=25.0,
-                        help='Additional smoothing factor for b1, and/or smoothing for mos b1 calc\'n')
 
-    parser.add_argument('--mosvol', nargs=2,  action='append', metavar=('vol','flip'),
+    preproc_group = parser.add_argument_group('Preprocessing')
+    preproc_group.add_argument('--preproc', action="store_true",
+                        help='Run preprocessing on input volumes (alignment, brain extraction, cropping).')
+
+    preproc_group.add_argument('--crop_padding', type=int, default=6,
+                        help='Edge padding for minimum volume crop size.')
+
+    preproc_group.add_argument('--mosvol', nargs=2,  action='append', metavar=('vol','flip'),
                         help='Add volume for MOS B1 map calculations with associated flip angle (deg)')
 
+    preproc_group.add_argument('--smooth', type=float, default=25.0,
+                        help='Smoothing for mos b1 calc\'n')
 
 
     #fitting options
+    fit_group = parser.add_argument_group('Fitting options')
 
-    parser.add_argument('--l1lam', type=float, default=1e-3,
+    fit_group.add_argument('--fit_method', choices=['vfa','emos','nlreg'], default='vfa',
+                        help='Fit method.')
+    fit_group.add_argument('--l1lam', type=float, default=1e-3,
                         help='l1 lambda: scaling factor for Huber penalty, 0 == disabled')
-    parser.add_argument('--kern_radius', type=int, default=1,
+    fit_group.add_argument('--kern_radius', type=int, default=1,
                         help='Huber spatial kernel radius.')
-    parser.add_argument('--huber_scale', type=float, default=3.0,
+    fit_group.add_argument('--huber_scale', type=float, default=3.0,
                         help='Huber spatial kernel radius.')
 
 
-    parser.add_argument('--l2lam', type=float, default=0.0,
+
+    fit_group.add_argument('--l2lam', type=float, default=0.0,
                         help='l2 lambda: scaling factor for Tikhonov penalty. 0 == disabled')
-    parser.add_argument('--l2mode', choices=['zero','vfa','smooth_vfa'], default='zero',
+    fit_group.add_argument('--l2mode', choices=['zero','vfa','smooth_vfa'], default='zero',
                         help='l2 Tikhonov penalty mode -- Distance from smooth prior, or zero (normal Tik). ')
-
-    parser.add_argument('--startmode', choices=['zero','vfa','smooth_vfa'], default='zero',
+    fit_group.add_argument('--smooth_prior', type=float, default=12.0,
+                        help='Smoothing for Prior\'n')
+    fit_group.add_argument('--startmode', choices=['zero','vfa','smooth_vfa'], default='zero',
                         help='Start mode -- start from zero or from vfa guess. ')
 
-    parser.add_argument('--verbose', '-v', action='store_true',
+    basic_group.add_argument('--verbose', '-v', action='store_true',
                         help='Verbose output.')
-    parser.add_argument('--debug', '-d', action='store_true',
+    basic_group.add_argument('--debug', '-d', action='store_true',
                         help='Debug output.')
+    basic_group.add_argument('--descriptive_names', action='store_true',
+                        help='Output fit names with param descriptions.')
+    basic_group.add_argument('--debug_image_path',
+                        help='Path for fit progress image dump.')
+    basic_group.add_argument('--nthreads', default=4,
+                        help='Number of threads to use for computation.')
 
-    parser.add_argument('--fit_method', choices=['vfa','emos','nlreg'], default='vfa',
-                        help='Fit method.')
+
+
+
 
 
     #simulation opions
