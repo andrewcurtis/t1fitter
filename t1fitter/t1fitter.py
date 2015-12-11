@@ -303,7 +303,7 @@ class T1Fitter(HasTraits):
                 if self.l1_lam > 0:
                     self.outname = self.outname + '_l1{}_k{}_h{}'.format(self.l1_lam, self.kern_sz, self.huber_scale)
                 if self.l2_lam > 0:
-                    self.outname = self.outname + '_l2{}_s{}_m{}'.format(self.l2_lam, self.smooth, self.l2_mode)
+                    self.outname = self.outname + '_l2{}_s{}_m{}'.format(self.l2_lam, self.smooth_fac, self.l2_mode)
                 self.outname = self.outname + '_sm{}_ftol{}_ncv{}'.format(self.start_mode, self.fit_tol, self.maxcor)
 
 
@@ -375,6 +375,25 @@ class T1Fitter(HasTraits):
         # TODO: run vfa fit to find m0, in order to scale data properly.
         # want mean(t1) ~ mean(m0)
 
+        def apply_bounds(x, bounds):
+            temp_sz = x.shape
+            x.shape = (-1,2)
+
+            tmp = x[:,0]<bounds[0,0]
+            x[tmp,0]=bounds[0,0]
+
+            tmp = x[:,1]<bounds[0,1]
+            x[tmp,1]=bounds[0,1]
+
+            tmp = x[:,0] > bounds[1,0]
+            x[tmp,0]=bounds[1,0]
+
+            tmp = x[:,1]>bounds[1,1]
+            x[tmp,1]=bounds[1,1]
+
+            x.shape = temp_sz
+
+            return x
 
         self.vfa_fit()
 
@@ -390,6 +409,8 @@ class T1Fitter(HasTraits):
 
         self.data *= 1.0/datascale
 
+        bounds = np.array([[0.001,0.01],[20.0,8.0]])
+
 
         #setup prior if we're using it
         if self.l2_lam > 0:
@@ -401,12 +422,13 @@ class T1Fitter(HasTraits):
                 self.make_smooth_vfa()
                 self.prior = self.fit.copy()
 
-                tmp_mask = self.mask.copy()
-                tmp_mask.shape = (-1)
+                tmp_mask =  self.mask.copy().ravel() > 0
 
                 self.prior.shape=(-1,2)
-                self.prior = self.prior[tmp_mask>0,1]
+                self.prior = apply_bounds(self.prior, bounds)
+                self.prior = self.prior[tmp_mask,1]
 
+                print(sum(self.prior>0))
                 regl = regularization.TikhonovDiffReg3D(self.prior)
             else:
                 regl = regularization.TikhonovReg3D()
@@ -444,9 +466,11 @@ class T1Fitter(HasTraits):
             #if self.start_mode == 'zero':
             x0 = np.zeros(self.volshape + [2])
 
+        x0 = apply_bounds(x0, bounds)
+
 
         if not prep_only:
-            self.fit = self.tfit.run_fit( x0 ).reshape(self.volshape + [2])
+            self.fit = self.tfit.run_fit( x0, bounds ).reshape(self.volshape + [2])
         else:
             return x0
 

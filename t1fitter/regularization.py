@@ -60,11 +60,11 @@ class TikhonovDiffReg3D(Regularizer3D):
         #ne.set_num_threads(nthreads)
 
     def reg_func(self, x):
-        return np.sqrt(np.sum((x - self.x0)**2))
+        return (np.sum((x - self.x0)**2))
 
 
     def reg_deriv(self, x):
-        grad = (x-self.x0)/np.sqrt(np.sum((x-self.x0)**2) )
+        grad = 2*(x-self.x0)
         return grad
 
 

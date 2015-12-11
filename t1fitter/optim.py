@@ -51,8 +51,6 @@ class T1FitNLLSReg(T1Fit):
 
     def objective(self, x):
 
-        self.itercount += 1
-        self.log.debug('obj called iter {}'.format(self.itercount))
 
 
         # reshape x to (flat , mo/t1)
@@ -68,7 +66,7 @@ class T1FitNLLSReg(T1Fit):
                 self.scratch[self.mask_flat,:] = x
                 self.to_vol(self.scratch)
                 mid2 = self.scratch.shape[1]
-                tmp = self.scratch[:,mid2,:,:]
+                tmp = self.scratch[:,int(mid2/2),:,:]
                 scipy.misc.toimage(np.c_[tmp[:,:,0],tmp[:,:,1]],
                         cmin=0.0, cmax=6.0).save(os.path.join(self.debugpath, 'iter{}.png'.format(self.itercount)))
 
@@ -109,6 +107,9 @@ class T1FitNLLSReg(T1Fit):
         # ravel for optimizer
         x.shape = (-1)
 
+        self.itercount += 1
+        self.log.debug('obj called iter {}'.format(self.itercount))
+
         return retval
 
 
@@ -146,6 +147,7 @@ class T1FitNLLSReg(T1Fit):
 
 
         if self.params.l2_lam > 0:
+
             l2dif = self.params.l2reg.reg_deriv(x[:,1])
             self.log.debug('l2dif shape: {}'.format(l2dif.shape))
 
@@ -186,16 +188,18 @@ class T1FitNLLSReg(T1Fit):
 
 
 
-    def run_fit(self, x0, prep_only=False):
+    def run_fit(self, x0, bounds, prep_only=False):
 
         #extract inner region so optimization domain is smaller
         #make logical mask
         self.mask_flat = self.params.mask.copy().ravel() > 0
 
         self.to_flat(x0)
+
         self.x0 = x0[self.mask_flat,:].copy().reshape(-1)
         #we only fit whats in the mask, so gradient is that size X num pars
         self.grad = np.zeros_like(self.x0)
+
 
 
         self.b1 = self.params.b1map.copy().ravel()
@@ -211,11 +215,11 @@ class T1FitNLLSReg(T1Fit):
         self.nx = nx/2.0
 
         #mo
-        bnds[::2,0] = 0.001
-        bnds[::2,1 ] = 20.0
+        bnds[::2,0] = bounds[0,0]
+        bnds[::2,1 ] = bounds[1,0]
         #t1
-        bnds[1::2,0] = 0.01
-        bnds[1::2,1 ] = 8.0
+        bnds[1::2,0] = bounds[0,1]
+        bnds[1::2,1 ] = bounds[1,1]
 
 
         if not prep_only:
