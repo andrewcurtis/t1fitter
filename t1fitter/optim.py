@@ -67,7 +67,8 @@ class T1FitNLLSReg(T1Fit):
                 self.to_flat(self.scratch)
                 self.scratch[self.mask_flat,:] = x
                 self.to_vol(self.scratch)
-                tmp = self.scratch[:,73,:,:]
+                mid2 = self.scratch.shape[1]
+                tmp = self.scratch[:,mid2,:,:]
                 scipy.misc.toimage(np.c_[tmp[:,:,0],tmp[:,:,1]],
                         cmin=0.0, cmax=6.0).save(os.path.join(self.debugpath, 'iter{}.png'.format(self.itercount)))
 

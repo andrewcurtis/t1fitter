@@ -39,6 +39,7 @@ class T1Fitter(HasTraits):
 
     #data
     b1map = Array
+    b1scale = Float(1.0)
     data = Array
     mask = Array
     #fit = Array
@@ -53,7 +54,7 @@ class T1Fitter(HasTraits):
     m0_range = Array
     kern_sz = Int(1)
     #recriprocal huber cutoff
-    huber_scale = Float(3.0)
+    huber_scale = Float(0.3)
     #params for BFGS
     fit_tol = Float(1e-6)
     maxcor = Int(15)
@@ -219,6 +220,7 @@ class T1Fitter(HasTraits):
         new_cli = ''
 
         self.nthreads = args.nthreads
+        self.b1scale = args.b1scale
 
         self.l1_lam = args.l1lam
         self.l2_lam = args.l2lam
@@ -290,6 +292,7 @@ class T1Fitter(HasTraits):
                 self.run_preproc_b1mos(args.mosvol)
                 new_cli = new_cli + ' --b1vol {} '.format(self.b1vol)
 
+        self.b1map *= self.b1scale
 
         self.check_data_sizes()
         self.outname = self.fit_method
@@ -301,7 +304,7 @@ class T1Fitter(HasTraits):
                     self.outname = self.outname + '_l1{}_k{}_h{}'.format(self.l1_lam, self.kern_sz, self.huber_scale)
                 if self.l2_lam > 0:
                     self.outname = self.outname + '_l2{}_s{}_m{}'.format(self.l2_lam, self.smooth, self.l2_mode)
-                self.outname = self.outname + '_sm{}_ftol{}_ncv{}'.format(self.startmode, self.fit_tol, self.maxcor)
+                self.outname = self.outname + '_sm{}_ftol{}_ncv{}'.format(self.start_mode, self.fit_tol, self.maxcor)
 
 
         if args.debug_image_path:
@@ -511,7 +514,7 @@ def t1fit_cli():
                         help='l1 lambda: scaling factor for Huber penalty, 0 == disabled')
     fit_group.add_argument('--kern_radius', type=int, default=1,
                         help='Huber spatial kernel radius.')
-    fit_group.add_argument('--huber_scale', type=float, default=3.0,
+    fit_group.add_argument('--huber_scale', type=float, default=0.3,
                         help='Huber spatial kernel radius.')
 
 
@@ -533,8 +536,11 @@ def t1fit_cli():
                         help='Output fit names with param descriptions.')
     basic_group.add_argument('--debug_image_path',
                         help='Path for fit progress image dump.')
-    basic_group.add_argument('--nthreads', default=4,
+    basic_group.add_argument('--nthreads', default=4, type=int,
                         help='Number of threads to use for computation.')
+
+    basic_group.add_argument('--b1scale', default=1.0, type=float,
+                        help='Scale b1.')
 
 
 
