@@ -438,10 +438,18 @@ class T1Fitter(HasTraits):
             self.l2reg = regl
 
         if self.l1_lam > 0:
-            self.hubreg = regularization.ParallelHuber2ClassReg3D(self.volshape + [2],
-                                                        hub_scale=self.huber_scale,
+        #if self.l1_mode == 'welsch':
+            self.hubreg = regularization.ParallelWelsch2ClassReg3D(self.volshape + [2],
+                                                        delta=self.huber_scale,
                                                         kern_radius=self.kern_sz,
                                                         nthreads=self.nthreads)
+        # else:
+        # self.hubreg = regularization.ParallelHuber2ClassReg3D(self.volshape + [2],
+        #                                            delta=self.huber_scale,
+        #                                            kern_radius=self.kern_sz,
+        #                                            nthreads=self.nthreads)
+
+
         # set up functions for optimizer
         t1model = model.T1Models(nthreads=self.nthreads)
 
