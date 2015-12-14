@@ -5,9 +5,9 @@ import numpy as np
 
 
 
-l1s = [  1e-4, 1e-3, 1e-2 ]
-l2s = [ 0, 1e-6, 1e-5, 1e-4 ]
-ksz = [1, 4]
+l1s = [  4e-4, 6e-4, 8e-4,1e-3  ]
+l2s = [   5e-6,  ]
+ksz = [1,2,4 ]
 
 
 

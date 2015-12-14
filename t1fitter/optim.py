@@ -228,7 +228,7 @@ class T1FitNLLSReg(T1Fit):
                             options={'maxcor':self.params.maxcor, 'ftol':self.params.fit_tol,
                                      'maxiter':self.params.maxiter, 'maxfun':self.params.maxfun})
 
-            self.log.info('results : {}'.format(res))
+            print('results : {}'.format(res))
 
             if res.success is not True:
                 self.log.error('Fitting error! {}'.format(res))

@@ -58,9 +58,9 @@ class T1Fitter(HasTraits):
     huber_scale = Float(0.3)
     #params for BFGS
     fit_tol = Float(1e-5)
-    maxcor = Int(15)
-    maxiter = Int(100)
-    maxfun = Int(1000)
+    maxcor = Int(25)
+    maxiter = Int(300)
+    maxfun = Int(3000)
     nthreads = Int(4)
 
     #remember affine matrix for output
