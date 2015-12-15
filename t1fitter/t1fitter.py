@@ -55,7 +55,7 @@ class T1Fitter(HasTraits):
     m0_range = Array
     kern_sz = Int(1)
     #recriprocal huber cutoff
-    huber_scale = Float(0.3)
+    delta = Float(0.3)
     #params for BFGS
     fit_tol = Float(1e-5)
     maxcor = Int(25)
@@ -67,6 +67,8 @@ class T1Fitter(HasTraits):
     base_image_affine = Array
 
     l1_lam = Float(1e-3)
+    l1_mode = Enum('huber','welsch')
+
     l2_lam = Float(1e-4)
     l2_prior = Bool(False)
     l2_mode = Enum('zero','vfa','smooth_vfa')
@@ -214,6 +216,21 @@ class T1Fitter(HasTraits):
             self.mask = nib.load(self.mask_path).get_data()
 
 
+    def load_startvols(self):
+
+        if self.init_files is not None:
+
+            self.log.info('Loading data files for optimizer init x0.')
+
+            m0 = nib.load(self.init_files[0]).get_data()
+            t1 = nib.load(self.init_files[1]).get_data()
+
+            assert(m0.shape == self.volshape)
+            assert(t1.shape == self.volshape)
+
+            return np.concatenate((m0,t1), axis=3)
+
+
     def init_from_cli(self, args):
 
         self.log.info('Parsing CLI: {}'.format(args))
@@ -226,13 +243,14 @@ class T1Fitter(HasTraits):
         self.l1_lam = args.l1lam
         self.l2_lam = args.l2lam
 
-
+        self.l1_mode = args.l1mode
         self.l2_mode = args.l2mode
 
         self.start_mode = args.startmode
+        self.init_files = args.startvols
 
         self.kern_sz = args.kern_radius
-        self.huber_scale = args.huber_scale
+        self.delta = args.delta
 
         self.fit_method = args.fit_method
         self.smooth_fac = args.smooth
@@ -269,7 +287,8 @@ class T1Fitter(HasTraits):
             self.run_preproc()
 
             for j, fname in enumerate(self.file_list):
-                new_cli = new_cli + ' --addvol {} {} {} '.format(fname, self.flips[j]*180.0/np.pi, self.trs[j] *1e3)
+                new_cli = new_cli + ' --addvol {} {} {} '.format(fname,
+                            self.flips[j]*180.0/np.pi, self.trs[j] *1e3)
 
             new_cli = new_cli + ' --mask {} '.format(self.mask_path)
 
@@ -302,10 +321,13 @@ class T1Fitter(HasTraits):
 
             if self.fit_method == 'nlreg':
                 if self.l1_lam > 0:
-                    self.outname = self.outname + '_l1{}_k{}_h{}'.format(self.l1_lam, self.kern_sz, self.huber_scale)
+                    self.outname = self.outname + '_l1{}_k{}_d{}_m{}'.format(self.l1_lam,
+                                            self.kern_sz, self.delta, self.l1_mode)
                 if self.l2_lam > 0:
-                    self.outname = self.outname + '_l2{}_s{}_m{}'.format(self.l2_lam, self.smooth_fac, self.l2_mode)
-                self.outname = self.outname + '_sm{}_ftol{}_ncv{}'.format(self.start_mode, self.fit_tol, self.maxcor)
+                    self.outname = self.outname + '_l2{}_s{}_m{}'.format(self.l2_lam,
+                                            self.smooth_fac, self.l2_mode)
+                self.outname = self.outname + '_sm{}_ftol{}_ncv{}'.format(self.start_mode,
+                                            self.fit_tol, self.maxcor)
 
 
         if args.debug_image_path:
@@ -438,16 +460,16 @@ class T1Fitter(HasTraits):
             self.l2reg = regl
 
         if self.l1_lam > 0:
-        #if self.l1_mode == 'welsch':
-            self.hubreg = regularization.ParallelWelsch2ClassReg3D(self.volshape + [2],
-                                                        delta=self.huber_scale,
-                                                        kern_radius=self.kern_sz,
-                                                        nthreads=self.nthreads)
-        # else:
-        # self.hubreg = regularization.ParallelHuber2ClassReg3D(self.volshape + [2],
-        #                                            delta=self.huber_scale,
-        #                                            kern_radius=self.kern_sz,
-        #                                            nthreads=self.nthreads)
+            if self.l1_mode == 'welsch':
+                self.spatialreg = regularization.ParallelWelsch2ClassReg3D(self.volshape + [2],
+                                                    delta=self.delta,
+                                                    kern_radius=self.kern_sz,
+                                                    nthreads=self.nthreads)
+            else:
+                self.spatialreg = regularization.ParallelHuber2ClassReg3D(self.volshape + [2],
+                                                    delta=self.delta,
+                                                    kern_radius=self.kern_sz,
+                                                    nthreads=self.nthreads)
 
 
         # set up functions for optimizer
@@ -471,10 +493,13 @@ class T1Fitter(HasTraits):
         elif self.start_mode == 'smooth_vfa':
             self.make_smooth_vfa()
             x0 = self.fit.copy()
+        elif self.start_mode == 'file':
+            x0 = self.load_initvols()
         else:
             #if self.start_mode == 'zero':
             x0 = np.zeros(self.volshape + [2])
 
+        # make sure we're starting within a valid region for our bounds
         x0 = apply_bounds(x0, bounds)
 
 
@@ -507,7 +532,8 @@ class T1Fitter(HasTraits):
 
 def t1fit_cli(args):
 
-    parser = argparse.ArgumentParser(description='T1fitter. VFA, eMOS, and NLReg, with optional preprocessing.')
+    parser = argparse.ArgumentParser(description='T1fitter. VFA, eMOS, and NLReg, ' +
+                                            'with optional preprocessing.')
 
     basic_group = parser.add_argument_group('Main Arguments')
     basic_group.add_argument('--addvol', '-a', nargs=3,  action='append', metavar=('vol','flip','tr'), required=True,
@@ -526,7 +552,8 @@ def t1fit_cli(args):
 
     preproc_group = parser.add_argument_group('Preprocessing')
     preproc_group.add_argument('--preproc', action="store_true",
-                        help='Run preprocessing on input volumes (alignment, brain extraction, cropping).')
+                        help='Run preprocessing on input volumes ' +
+                            '(alignment, brain extraction, cropping).')
 
     preproc_group.add_argument('--crop_padding', type=int, default=6,
                         help='Edge padding for minimum volume crop size.')
@@ -544,22 +571,28 @@ def t1fit_cli(args):
     fit_group.add_argument('--fit_method', choices=['vfa','emos','nlreg'], default='vfa',
                         help='Fit method.')
     fit_group.add_argument('--l1lam', type=float, default=1e-3,
-                        help='l1 lambda: scaling factor for Huber penalty, 0 == disabled')
+                        help='l1 lambda: scaling factor for spatial penalty, 0 == disabled')
+    fit_group.add_argument('--l1mode', choices=['huber','welsch'], default='huber',
+                        help='pseudo-l1 spatial penalty mode -- huber or welsch. ')
     fit_group.add_argument('--kern_radius', type=int, default=1,
                         help='Huber spatial kernel radius.')
-    fit_group.add_argument('--huber_scale', type=float, default=0.3,
-                        help='Huber spatial kernel radius.')
+    fit_group.add_argument('--delta', type=float, default=0.3,
+                        help='Spatial regularizer scale factor.')
 
 
 
     fit_group.add_argument('--l2lam', type=float, default=0.0,
                         help='l2 lambda: scaling factor for Tikhonov penalty. 0 == disabled')
     fit_group.add_argument('--l2mode', choices=['zero','vfa','smooth_vfa'], default='zero',
-                        help='l2 Tikhonov penalty mode -- Distance from smooth prior, or zero (normal Tik). ')
+                        help='l2 Tikhonov penalty mode -- Distance from [smooth] prior, or zero (normal Tik). ')
     fit_group.add_argument('--smooth_prior', type=float, default=12.0,
                         help='Smoothing for Prior\'n')
-    fit_group.add_argument('--startmode', choices=['zero','vfa','smooth_vfa'], default='zero',
+
+    fit_group.add_argument('--startmode', choices=['zero','vfa','smooth_vfa','file'], default='zero',
                         help='Start mode -- start from zero or from vfa guess. ')
+    fit_group.add_argument('--startvols', nargs=2,  action='append', metavar=('m0','t1'),
+                    help='Specify initialization volume for fitting (required with startmode=file).')
+
 
     basic_group.add_argument('--verbose', '-v', action='store_true',
                         help='Verbose output.')
@@ -577,8 +610,8 @@ def t1fit_cli(args):
 
 
     #simulation opions
-    parser.add_argument('--addnoise', type=float, default=-1,
-                        help='Add noise. Normaize input data to 1 and add this std() worth of noise.')
+    #parser.add_argument('--addnoise', type=float, default=-1,
+    #                    help='Add noise. Normaize input data to 1 and add this std() worth of noise.')
 
     cmd_args = parser.parse_args(args)
 

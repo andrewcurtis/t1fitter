@@ -70,3 +70,11 @@ python t1fitter.py --addvol ~/t1fit/dec3dat/procfa14_bet_crop.nii.gz 14.0 10.0 \
   --mask ~/t1fit/dec3dat/procfa14_bet_mask_crop.nii.gz \
   --kern_radius 1 --huber_scale 0.25 --fit_method nlreg --startmode zero --l2mode smooth_vfa  --smooth 20 \
   --l1lam 1e-3 --l2lam 1e-5
+
+
+
+
+
+python t1fitter.py --addvol /home/acurtis/tmp/procfa14_bet_crop.nii.gz 14.0 10.6  --addvol /home/acurtis/tmp/procfa3_align_bet_crop.nii.gz 3.0 10.6  --mask /home/acurtis/tmp/procfa14_bet_mask_crop.nii.gz  --b1vol /home/acurtis/tmp/b1_mos.nii.gz  --out ~/tmp/  --l1lam 8e-4 --kern_radius 4 --delta 0.25 --l2lam 1e-6 --fit_method nlreg --startmode  zero  --b1scale 1.12 --debug_image_path /home/acurtis/tmp/debug_iter --descriptive_names --l2mode smooth_vfa --verbose --l1mode huber
+
+python t1fitter.py --addvol /home/acurtis/tmp/procfa14_bet_crop.nii.gz 14.0 10.6  --addvol /home/acurtis/tmp/procfa3_align_bet_crop.nii.gz 3.0 10.6  --mask /home/acurtis/tmp/procfa14_bet_mask_crop.nii.gz  --b1vol /home/acurtis/tmp/b1_mos.nii.gz  --out ~/tmp/  --l1lam 8e-4 --kern_radius 4 --delta 0.25 --l2lam 1e-6 --fit_method nlreg --startmode  file  --b1scale 1.12 --debug_image_path /home/acurtis/tmp/debug_iter --descriptive_names --l2mode smooth_vfa --verbose --l1mode welsch --startvols ~/tmp/m0_ ~/tmp/t1_
