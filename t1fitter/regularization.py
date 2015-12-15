@@ -87,12 +87,15 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
         self.kern_sz = kern_radius
         self.delta = delta
 
-        if kern_radius == 1:
-            self.init_kern1()
-        elif kern_radius == 2:
-            self.init_kern2()
-        else:
-            self.init_bi_tv_kern()
+        # if kern_radius == 1:
+        #     self.init_kern1()
+        # elif kern_radius == 2:
+        #     self.init_kern2()
+        # else:
+        #     self.init_bi_tv_kern()
+
+        #Many nn? just use bitv? not really optimized...
+        self.init_bi_tv_kern()
 
         # Do jitting to set up multithreaded huber evaluator
         self.init_reg()
@@ -107,20 +110,20 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
     def init_kern2(self):
 
-        kern2 = np.zeros(12)
+        kern2 = np.zeros(13)
         kern2[1] = 1.0/12.0
         kern2[2] = 1.0/24.0
         kern2[3] = 1/36.0;
         kern2[4] = 1/48.0;
 
-        kern2 = kern2 / 1.34722;
+        kern2 = kern2 / 1.34722
 
         self.kern_weights = kern2
 
 
     def init_bi_tv_kern(self):
-        # Needs to be kern_sz^3 since we index with squared distance
-        g = np.zeros(64)
+        # Needs to be 3*kern_sz^2+1 since we index with squared distance
+        g = np.zeros(49)
         g[1] = 8.58513e-3;
         g[4] = 5.63861e-3;
         g[9] = 3.12348e-3;
@@ -220,7 +223,7 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
                                 else:
                                     tmp = delta*(z-0.5*delta)
 
-                                accum += tmp * w
+                                accum += tmp * w * 0.5
         res[tidx] = accum
         restorethread(threadstate)
 
@@ -306,7 +309,7 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
 
                                 rval = 1.0
                                 if z >= delta:
-                                    rval = 0.5/z
+                                    rval = delta/z
 
 
                                 output[ss, rr, cc, 0] += rval*w*diffs1
@@ -337,7 +340,6 @@ class ParallelHuber2ClassReg3D(Regularizer3D):
                 thread.start()
 
             # the main thread handles the last chunk
-            #TODO CHECK
             if (ksz + chunklen*numthreads) < (length-ksz):
                 lastargs = args + (ksz + chunklen*numthreads, length-ksz)
                 #print (ksz + chunklen*numthreads, length-ksz)
@@ -364,14 +366,15 @@ class Huber2ClassReg3D(Regularizer3D):
         self.kern_sz = kern_radius
         self.scratch = np.zeros(img_sz)
         self.delta = delta
+        #
+        # if kern_radius == 1:
+        #     self.init_kern1()
+        # elif kern_radius == 2:
+        #     self.init_kern2()
+        # else:
+        #     self.init_bi_tv_kern()
 
-        if kern_radius == 1:
-            self.init_kern1()
-        elif kern_radius == 2:
-            self.init_kern2()
-        else:
-            self.init_bi_tv_kern()
-
+        self.init_bi_tv_kern()
 
     def reg_func(self, x):
         return self.huber_single(x, self.kern_weights, self.kern_sz, self.delta)
@@ -513,7 +516,7 @@ class Huber2ClassReg3D(Regularizer3D):
 
                                 rval = 1.0
                                 if z >= delta:
-                                    rval = 0.5/z
+                                    rval = delta/z
 
 
                                 output[ss, rr, cc, 0] += rval*w*diffs1
@@ -541,13 +544,14 @@ class ParallelWelsch2ClassReg3D(Regularizer3D):
         self.kern_sz = kern_radius
         self.delta = delta
 
-        if kern_radius == 1:
-            self.init_kern1()
-        elif kern_radius == 2:
-            self.init_kern2()
-        else:
-            self.init_bi_tv_kern()
+        # if kern_radius == 1:
+        #     self.init_kern1()
+        # elif kern_radius == 2:
+        #     self.init_kern2()
+        # else:
+        #     self.init_bi_tv_kern()
 
+        self.init_bi_tv_kern()
         # Do jitting to set up multithreaded huber evaluator
         self.init_reg()
 

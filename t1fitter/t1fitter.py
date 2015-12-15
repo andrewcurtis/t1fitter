@@ -36,7 +36,7 @@ class T1Fitter(HasTraits):
 
     outpath = String
     outname = String
-    debugpath = String
+    debugpath = String(None)
 
     #data
     b1map = Array
@@ -600,7 +600,7 @@ def t1fit_cli(args):
                         help='Debug output.')
     basic_group.add_argument('--descriptive_names', action='store_true',
                         help='Output fit names with param descriptions.')
-    basic_group.add_argument('--debug_image_path',
+    basic_group.add_argument('--debug_image_path', default=None,
                         help='Path for fit progress image dump.')
     basic_group.add_argument('--nthreads', default=4, type=int,
                         help='Number of threads to use for computation.')
