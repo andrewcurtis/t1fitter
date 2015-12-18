@@ -72,7 +72,7 @@ class T1Fitter(HasTraits):
     l2_lam = Float(1e-4)
     l2_prior = Bool(False)
     l2_mode = Enum('zero','vfa','smooth_vfa')
-    start_mode = Enum('zero','vfa','smooth_vfa')
+    start_mode = Enum('zero','vfa','smooth_vfa','file')
 
 
 
@@ -198,11 +198,11 @@ class T1Fitter(HasTraits):
 
         self.volshape = list(dat_sz)
 
-        self.log.info('First vol had shape: {}'.format(dat_sz))
+        self.log.debug('First vol had shape: {}'.format(dat_sz))
 
         dat_sz = [nvols] + list(dat_sz)
 
-        self.log.info('Alloc array memory with shape {}'.format(dat_sz))
+        self.log.debug('Alloc array memory with shape {}'.format(dat_sz))
 
         self.data = np.zeros(dat_sz, dtype=tmp.get_data_dtype())
 
@@ -222,13 +222,16 @@ class T1Fitter(HasTraits):
 
             self.log.info('Loading data files for optimizer init x0.')
 
-            m0 = nib.load(self.init_files[0]).get_data()
-            t1 = nib.load(self.init_files[1]).get_data()
+            m0 = nib.load(self.init_files[0][0]).get_data()
+            t1 = nib.load(self.init_files[0][1]).get_data()
 
-            assert(m0.shape == self.volshape)
-            assert(t1.shape == self.volshape)
+            assert(list(m0.shape) == self.volshape)
+            assert(list(t1.shape) == self.volshape)
 
-            return np.concatenate((m0,t1), axis=3)
+            m0.shape = list(m0.shape) + [1]
+            t1.shape = list(t1.shape) + [1]
+
+            return np.concatenate((m0,t1), axis=3).copy()
 
 
     def init_from_cli(self, args):
@@ -279,11 +282,11 @@ class T1Fitter(HasTraits):
 
         self.flips = np.array(tmp_fa).astype(float) * np.pi / 180.0
         self.trs = np.array(tmp_tr).astype(float) * 1e-3
-        self.log.info('found flips: {}, trs: {}'.format(self.flips, self.trs))
+        self.log.debug('found flips: {}, trs: {}'.format(self.flips, self.trs))
 
 
         if args.preproc:
-            self.log.info('preprocessing selected, running')
+            self.log.debug('preprocessing selected, running')
             self.run_preproc()
 
             for j, fname in enumerate(self.file_list):
@@ -347,7 +350,7 @@ class T1Fitter(HasTraits):
         flips = self.flips[takeflips,...].copy()
         data = self.data[takeflips,...].copy()
 
-        self.log.info('Smoothing data by {}'.format(self.smooth_fac))
+        self.log.debug('Smoothing data by {}'.format(self.smooth_fac))
 
         data.shape = [2] + self.volshape
         data[0,...] = util.filt3d(data[0,...], self.smooth_fac)
@@ -356,7 +359,7 @@ class T1Fitter(HasTraits):
         trs = self.trs[takeflips,...].copy()
         b1 = self.b1map.copy()
 
-        self.log.info('Fitting.')
+        self.log.debug('Fitting.')
 
         self.fit = tfit.vfa_fit(flips, data, trs[0], b1 )
         self.fit.shape = self.volshape + [2]
@@ -494,7 +497,7 @@ class T1Fitter(HasTraits):
             self.make_smooth_vfa()
             x0 = self.fit.copy()
         elif self.start_mode == 'file':
-            x0 = self.load_initvols()
+            x0 = self.load_startvols()
         else:
             #if self.start_mode == 'zero':
             x0 = np.zeros(self.volshape + [2])
