@@ -57,8 +57,8 @@ class T1Fitter(HasTraits):
     #recriprocal huber cutoff
     delta = Float(0.3)
     #params for BFGS
-    fit_tol = Float(1e-5)
-    maxcor = Int(25)
+    fit_tol = Float(1e-4)
+    maxcor = Int(15)
     maxiter = Int(300)
     maxfun = Int(3000)
     nthreads = Int(4)
@@ -145,7 +145,10 @@ class T1Fitter(HasTraits):
                                          outpath = self.outpath)
 
         #replace input file list with processed files. order is reference:rest
-        self.file_list_orig = self.file_list
+        #explicity copy
+        self.file_list_orig = list(self.file_list)
+
+        #replace old params with new ones
         self.file_list = processed
         self.clip_lims = cliplims
         self.mask_path = mask
