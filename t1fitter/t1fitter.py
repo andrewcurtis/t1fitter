@@ -1,8 +1,6 @@
 """
-Driver for t1fitter.
-
-Handles CLI or GUI interface.
-Reads image volumes and speficications, set up problem, runs, and saves output.
+Main T1fitter class. 
+Handles problem setup, choices for regularizers and fitting methods.
 """
 
 
@@ -22,6 +20,9 @@ import regularization
 from traits.api import HasTraits, Float, List, Int, Array, \
     Directory, Bool, Enum, String, List
 
+
+
+
 class T1Fitter(HasTraits):
 
     # paths
@@ -31,22 +32,28 @@ class T1Fitter(HasTraits):
     mask_path = String
     b1vol = String
 
-    trs = Array
-    flips = Array
 
     outpath = String
     outname = String
     debugpath = String(None)
 
-    #data
-    b1map = Array
     b1scale = Float(1.0)
+
+    #data
+    trs = Array
+    flips = Array
+    b1map = Array
     data = Array
     mask = Array
-    #fit = Array
+    # NLreg Fit returns a OptimizationResult which is like a dict. 
+    # other fits just create an Array. 
+    fit = Python
     prior = Array
 
+    #Store base volume shape 
     volshape = List
+    #remember affine matrix for output
+    base_image_affine = Array
 
     fit_method = Enum('vfa','emos','nlreg')
 
@@ -63,31 +70,23 @@ class T1Fitter(HasTraits):
     maxfun = Int(3000)
     nthreads = Int(4)
 
-    #remember affine matrix for output
-    base_image_affine = Array
 
-    l1_lam = Float(1e-3)
+    #Regularization options
+    l1_lam = Float(5e-4)
     l1_mode = Enum('huber','welsch')
 
-    l2_lam = Float(1e-4)
+    l2_lam = Float(2e-6)
     l2_prior = Bool(False)
     l2_mode = Enum('zero','vfa','smooth_vfa')
+    
     start_mode = Enum('zero','vfa','smooth_vfa','file')
 
-
-
-    # to pass to solver
     lambdas = List
-    penalties = List
-
-
 
     #params for preproc
     smooth_fac = Float(25.0)
     crop_padding = Int(4)
-
     clip_lims = List()
-
 
     debug = Bool(False)
 
@@ -95,7 +94,7 @@ class T1Fitter(HasTraits):
 
     def __init__(self):
 
-        FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
+        FORMAT = "[%(filename)s:%(lineno)4s - %(funcName)20s() ] %(message)s"
         logging.basicConfig(format=FORMAT)
         self.log = logging.getLogger('T1Fit')
         #default off
@@ -116,7 +115,6 @@ class T1Fitter(HasTraits):
 
     def save_fit_results(self):
 
-
         fname = os.path.join(self.outpath, 'm0_{}.nii.gz'.format(self.outname))
         self.log.info('Saving M0 volume to {}'.format(fname))
         self.write_nifti(self.fit[...,0], fname)
@@ -130,7 +128,6 @@ class T1Fitter(HasTraits):
             fname = os.path.join(self.outpath, 'b1_{}.nii.gz'.format(self.outname))
             self.log.info('Saving B1 volume to {}'.format(fname))
             self.write_nifti(self.fit[...,2], fname)
-
 
 
 
@@ -236,113 +233,6 @@ class T1Fitter(HasTraits):
 
             return np.concatenate((m0,t1), axis=3).copy()
 
-
-    def init_from_cli(self, args):
-
-        self.log.info('Parsing CLI: {}'.format(args))
-
-        new_cli = ''
-
-        self.nthreads = args.nthreads
-        self.b1scale = args.b1scale
-
-        self.l1_lam = args.l1lam
-        self.l2_lam = args.l2lam
-
-        self.l1_mode = args.l1mode
-        self.l2_mode = args.l2mode
-
-        self.start_mode = args.startmode
-        self.init_files = args.startvols
-
-        self.kern_sz = args.kern_radius
-        self.delta = args.delta
-
-        self.fit_method = args.fit_method
-        self.smooth_fac = args.smooth
-
-        self.outpath = args.out
-
-        if args.verbose:
-            self.log.setLevel(logging.INFO)
-
-        if args.debug:
-            self.log.setLevel(logging.DEBUG)
-            self.debug = True
-
-        if args.addvol is None:
-            self.log.error('Need input volumes!')
-
-        # get filenames
-        tmp_tr = []
-        tmp_fa = []
-        for vol in args.addvol:
-            self.log.info('addvol args: {}'.format(vol))
-            self.file_list.append(vol[0])
-            tmp_fa.append(vol[1])
-            tmp_tr.append(vol[2])
-
-
-        self.flips = np.array(tmp_fa).astype(float) * np.pi / 180.0
-        self.trs = np.array(tmp_tr).astype(float) * 1e-3
-        self.log.debug('found flips: {}, trs: {}'.format(self.flips, self.trs))
-
-
-        if args.preproc:
-            self.log.debug('preprocessing selected, running')
-            self.run_preproc()
-
-            for j, fname in enumerate(self.file_list):
-                new_cli = new_cli + ' --addvol {} {} {} '.format(fname,
-                            self.flips[j]*180.0/np.pi, self.trs[j] *1e3)
-
-            new_cli = new_cli + ' --mask {} '.format(self.mask_path)
-
-        # preprocessing will change file_list entries, so load after.
-        self.load_vols(self.data, self.file_list)
-
-
-        if args.maskvol is not None:
-            self.log.info('Found mask volume {}, overriding self.mask'.format(args.maskvol))
-            self.mask = nib.load(args.maskvol).get_data()
-
-        if args.b1vol is not None:
-            self.log.info('Found b1 volume {}'.format(args.b1vol))
-            self.b1vol = args.b1vol
-            self.b1map = nib.load(args.b1vol).get_data()
-        else:
-            self.log.info('No b1 map given, looking for source data to generate map.')
-            #if no b1, check if we can process it from the arguments
-            if args.mosvol is not None:
-                self.log.info('B1 MOS data found, processing.')
-                self.run_preproc_b1mos(args.mosvol)
-                new_cli = new_cli + ' --b1vol {} '.format(self.b1vol)
-
-        self.b1map *= self.b1scale
-
-        self.check_data_sizes()
-        self.outname = self.fit_method
-
-        if args.descriptive_names:
-
-            if self.fit_method == 'nlreg':
-                if self.l1_lam > 0:
-                    self.outname = self.outname + '_l1{}_k{}_d{}_m{}'.format(self.l1_lam,
-                                            self.kern_sz, self.delta, self.l1_mode)
-                if self.l2_lam > 0:
-                    self.outname = self.outname + '_l2{}_s{}_m{}'.format(self.l2_lam,
-                                            self.smooth_fac, self.l2_mode)
-                self.outname = self.outname + '_sm{}_ftol{}_ncv{}'.format(self.start_mode,
-                                            self.fit_tol, self.maxcor)
-
-
-        if args.debug_image_path:
-            self.debugpath = args.debug_image_path
-
-        if len(new_cli) > 0:
-            print('Processing changed files. If you want to rerun the fitting ' +
-                 ' with different arguments, please use the following command line options:')
-            print(new_cli)
 
 
     def make_smooth_vfa(self):
@@ -534,102 +424,3 @@ class T1Fitter(HasTraits):
         pass
 
 
-
-
-def t1fit_cli(args):
-
-    parser = argparse.ArgumentParser(description='T1fitter. VFA, eMOS, and NLReg, ' +
-                                            'with optional preprocessing.')
-
-    basic_group = parser.add_argument_group('Main Arguments')
-    basic_group.add_argument('--addvol', '-a', nargs=3,  action='append', metavar=('vol','flip','tr'), required=True,
-                        help='Add volume for fitting with flip angle (deg) and tr (ms)')
-
-    basic_group.add_argument('--out', '-o', default='t1fit',
-                        help='Output volume base name for t1 and m0 fit.')
-
-    extravols_group = parser.add_argument_group('Additional Volumes')
-    extravols_group.add_argument('--maskvol',
-                        help='Brain mask volume (must be provided if no preprocessing is used).')
-
-    extravols_group.add_argument('--b1vol',
-                        help='Pre calculated B1 map (as relative scaling of base FAs).')
-
-
-    preproc_group = parser.add_argument_group('Preprocessing')
-    preproc_group.add_argument('--preproc', action="store_true",
-                        help='Run preprocessing on input volumes ' +
-                            '(alignment, brain extraction, cropping).')
-
-    preproc_group.add_argument('--crop_padding', type=int, default=6,
-                        help='Edge padding for minimum volume crop size.')
-
-    preproc_group.add_argument('--mosvol', nargs=2,  action='append', metavar=('vol','flip'),
-                        help='Add volume for MOS B1 map calculations with associated flip angle (deg)')
-
-    preproc_group.add_argument('--smooth', type=float, default=25.0,
-                        help='Smoothing for mos b1 calc\'n')
-
-
-    #fitting options
-    fit_group = parser.add_argument_group('Fitting options')
-
-    fit_group.add_argument('--fit_method', choices=['vfa','emos','nlreg'], default='vfa',
-                        help='Fit method.')
-    fit_group.add_argument('--l1lam', type=float, default=1e-3,
-                        help='l1 lambda: scaling factor for spatial penalty, 0 == disabled')
-    fit_group.add_argument('--l1mode', choices=['huber','welsch'], default='huber',
-                        help='pseudo-l1 spatial penalty mode -- huber or welsch. ')
-    fit_group.add_argument('--kern_radius', type=int, default=1,
-                        help='Huber spatial kernel radius.')
-    fit_group.add_argument('--delta', type=float, default=0.3,
-                        help='Spatial regularizer scale factor.')
-
-
-
-    fit_group.add_argument('--l2lam', type=float, default=0.0,
-                        help='l2 lambda: scaling factor for Tikhonov penalty. 0 == disabled')
-    fit_group.add_argument('--l2mode', choices=['zero','vfa','smooth_vfa'], default='zero',
-                        help='l2 Tikhonov penalty mode -- Distance from [smooth] prior, or zero (normal Tik). ')
-    fit_group.add_argument('--smooth_prior', type=float, default=12.0,
-                        help='Smoothing for Prior\'n')
-
-    fit_group.add_argument('--startmode', choices=['zero','vfa','smooth_vfa','file'], default='zero',
-                        help='Start mode -- start from zero or from vfa guess. ')
-    fit_group.add_argument('--startvols', nargs=2,  action='append', metavar=('m0','t1'),
-                    help='Specify initialization volume for fitting (required with startmode=file).')
-
-
-    basic_group.add_argument('--verbose', '-v', action='store_true',
-                        help='Verbose output.')
-    basic_group.add_argument('--debug', '-d', action='store_true',
-                        help='Debug output.')
-    basic_group.add_argument('--descriptive_names', action='store_true',
-                        help='Output fit names with param descriptions.')
-    basic_group.add_argument('--debug_image_path', default=None,
-                        help='Path for fit progress image dump.')
-    basic_group.add_argument('--nthreads', default=4, type=int,
-                        help='Number of threads to use for computation.')
-
-    basic_group.add_argument('--b1scale', default=1.0, type=float,
-                        help='Scale b1.')
-
-
-    #simulation opions
-    #parser.add_argument('--addnoise', type=float, default=-1,
-    #                    help='Add noise. Normaize input data to 1 and add this std() worth of noise.')
-
-    cmd_args = parser.parse_args(args)
-
-    print(cmd_args)
-
-
-    fitter = T1Fitter()
-    fitter.init_from_cli(cmd_args)
-    fitter.run_fit()
-
-
-
-
-if __name__ == '__main__':
-    t1fit_cli(sys.argv[1:])
