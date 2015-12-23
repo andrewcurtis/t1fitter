@@ -16,6 +16,8 @@ from numba import autojit, jit, void, double, int64
 
 from traits.api import HasTraits, Float, List, Int, Array, CFloat
 
+import sys
+
 from numpy import sqrt, exp
 
 savethread = pythonapi.PyEval_SaveThread
@@ -98,7 +100,6 @@ class SpatialReg(Regularizer3D):
 
         #optimized kernel
         self.init_bi_tv_kern(radius = kern_radius)
-        self.init_reg()
 
     def init_kern1(self):
         g = np.zeros(4)
@@ -170,6 +171,8 @@ class SpatialReg(Regularizer3D):
             # in this example because we use jit().
             threads = [threading.Thread(target=inner_func, args= args + (res,) +  rng + (cnt,) )
                        for cnt,rng in enumerate(ranges)]
+
+
             for thread in threads:
                 thread.start()
 
@@ -178,7 +181,6 @@ class SpatialReg(Regularizer3D):
 
             if (ksz + chunklen*numthreads) < (length-ksz):
                 lastargs = args + (res,) + (ksz + chunklen*numthreads, length-ksz) + (numthreads,)
-                #print (ksz + chunklen*numthreads, length-ksz)
                 inner_func(*lastargs)
 
             for thread in threads:
@@ -228,6 +230,10 @@ class ParallelHuber2ClassReg3D(SpatialReg):
 
     """
 
+    def __init__(self, img_sz, nthreads=8, kern_radius=1, delta=3.0):
+        super(ParallelHuber2ClassReg3D, self).__init__(img_sz, nthreads, kern_radius, delta)
+        self.init_reg()
+
     def init_reg(self):
         # JITTED version of huber penalty.
         huber_sig = void(double[:,:,:,:], double[:], int64, double, double[:], int64, int64, int64)
@@ -239,8 +245,8 @@ class ParallelHuber2ClassReg3D(SpatialReg):
 
         # multi_* are our parallelized versions
         # this wraps the calculation in a multi threaded evaluator
-        self.multi_ghuber = self.make_multithread(ghuber_jitted, self.nthreads)
-        self.multi_huber = self.make_grad_multithread(huber_jitted, self.nthreads)
+        self.multi_huber = self.make_multithread(huber_jitted, self.nthreads)
+        self.multi_ghuber = self.make_grad_multithread(ghuber_jitted, self.nthreads)
 
 
     def reg_func(self, x):
@@ -492,6 +498,9 @@ class ParallelWelsch2ClassReg3D(SpatialReg):
     Classes are assumed to be interleaved (e.g. datashape is (nz, ny, nx, 2))
 
     """
+    def __init__(self, img_sz, nthreads=8, kern_radius=1, delta=3.0):
+        super(ParallelWelsch2ClassReg3D, self).__init__(img_sz, nthreads, kern_radius, delta)
+        self.init_reg()
 
     def init_reg(self):
         # JITTED version of huber penalty.

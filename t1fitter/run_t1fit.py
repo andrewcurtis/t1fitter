@@ -9,13 +9,14 @@ Handles CLI interface and execution logic.
 import argparse
 import os
 import sys
-
+import numpy as np
 import t1fitter
+import logging
 
-
+import nibabel as nib
 
 def gen_cli():
-    
+
     parser = argparse.ArgumentParser(description='T1fitter. VFA, eMOS, and NLReg, ' +
                                             'with optional preprocessing.')
 
@@ -37,8 +38,8 @@ def gen_cli():
                         help='Number of threads to use for computation.')
     basic_group.add_argument('--b1scale', default=1.0, type=float,
                         help='Scale b1.')
-                        
-                        
+
+
     extravols_group = parser.add_argument_group('Additional Input Volumes')
     extravols_group.add_argument('--maskvol',
                         help='Brain mask volume (must be provided if no preprocessing is used).')
@@ -76,7 +77,7 @@ def gen_cli():
                         help='pseudo-l1 spatial regularizer mode -- huber or welsch. ')
     fit_group.add_argument('--kern_radius', type=int, default=1,
                         help='Spatial regularizer kernel radius.')
-    fit_group.add_argument('--delta', type=float, default=0.3,
+    fit_group.add_argument('--delta', type=float, default=0.4,
                         help='Spatial regularizer scale factor.')
 
 
@@ -94,7 +95,7 @@ def gen_cli():
 
 
 
-    
+
     return parser
 
 
@@ -201,20 +202,19 @@ def main():
             if fitter.l2_lam > 0:
                 fitter.outname = fitter.outname + '_l2{}_s{}_m{}'.format(fitter.l2_lam,
                                         fitter.smooth_fac, fitter.l2_mode)
-            fitter.outname = fitter.outname + '_sm{}_ftol{}_ncv{}'.format(fitter.start_mode,
-                                        fitter.fit_tol, fitter.maxcor)
+            fitter.outname = fitter.outname + '_sm{}_ftol{}_ncv{}_nvol{}'.format(fitter.start_mode,
+                                        fitter.fit_tol, fitter.maxcor, len(fitter.file_list))
 
-
-    if args.debug_image_path:
-        fitter.debugpath = args.debug_image_path
 
     if len(new_cli) > 0:
         print('\nProcessing changed files. If you want to rerun the fitting ' +
              ' with different arguments, please use the following command line options:\n\n')
         print(new_cli + '\n')
 
-    
-    if not args.preproc_only: 
+    if args.debug_image_path is not None:
+        fitter.debugpath = args.debug_image_path
+
+    if not args.preproc_only:
         fitter.run_fit()
 
 

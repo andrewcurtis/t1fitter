@@ -1,5 +1,5 @@
 """
-Main T1fitter class. 
+Main T1fitter class.
 Handles problem setup, choices for regularizers and fitting methods.
 """
 
@@ -18,7 +18,7 @@ import util
 import regularization
 
 from traits.api import HasTraits, Float, List, Int, Array, \
-    Directory, Bool, Enum, String, List
+    Directory, Bool, Enum, String, List, Python
 
 
 
@@ -45,12 +45,12 @@ class T1Fitter(HasTraits):
     b1map = Array
     data = Array
     mask = Array
-    # NLreg Fit returns a OptimizationResult which is like a dict. 
-    # other fits just create an Array. 
+    # NLreg Fit returns a OptimizationResult which is like a dict.
+    # other fits just create an Array.
     fit = Python
     prior = Array
 
-    #Store base volume shape 
+    #Store base volume shape
     volshape = List
     #remember affine matrix for output
     base_image_affine = Array
@@ -78,7 +78,7 @@ class T1Fitter(HasTraits):
     l2_lam = Float(2e-6)
     l2_prior = Bool(False)
     l2_mode = Enum('zero','vfa','smooth_vfa')
-    
+
     start_mode = Enum('zero','vfa','smooth_vfa','file')
 
     lambdas = List
@@ -413,14 +413,21 @@ class T1Fitter(HasTraits):
         self.log.info('mask_size: {}'.format(self.mask.shape))
         self.log.info('flips_size: {}'.format(self.flips.shape))
 
-        assert(self.b1map.shape == self.mask.shape)
-        #data is #vols x space, each vol needs to match mask/b1
-        assert(self.data.shape[1:] == self.mask.shape)
 
+        if np.prod(self.mask.shape) > 0:
+            assert(self.data.shape[1:] == self.mask.shape)
+        else:
+            self.mask = self.data[0,...]>0
+
+
+        if np.prod(self.b1map.shape) > 0:
+            assert(self.b1map.shape == self.mask.shape)
+        else:
+            self.b1map = np.ones_like(self.mask)
+
+        #data is #vols x space, each vol needs to match mask/b1
         assert(self.data.shape[0] == self.flips.shape[0])
 
 
     def init_traits_gui(self):
         pass
-
-
