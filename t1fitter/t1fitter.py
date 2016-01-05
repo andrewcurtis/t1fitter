@@ -55,7 +55,7 @@ class T1Fitter(HasTraits):
     #remember affine matrix for output
     base_image_affine = Array
 
-    fit_method = Enum('vfa','emos','nlreg')
+    fit_method = Enum('vfa','emos','nlreg','hub_wel')
 
     #fitting parameters
     t1_range = Array
@@ -64,7 +64,7 @@ class T1Fitter(HasTraits):
     #recriprocal huber cutoff
     delta = Float(0.3)
     #params for BFGS
-    fit_tol = Float(1e-4)
+    fit_tol = Float(1e-5)
     maxcor = Int(15)
     maxiter = Int(300)
     maxfun = Int(3000)
@@ -109,6 +109,8 @@ class T1Fitter(HasTraits):
             self.emos_fit()
         elif self.fit_method == 'nlreg':
             self.nlreg_fit()
+        elif self.fit_method == 'hub_wel':
+            self.nlreg_hub_wel_fit()
 
         self.save_fit_results()
 
@@ -288,7 +290,6 @@ class T1Fitter(HasTraits):
         self.log.info('after vfa_fit, fit size is: {}'.format(self.fit.shape))
 
 
-
     def nlreg_fit(self, prep_only=False):
 
         # TODO: run vfa fit to find m0, in order to scale data properly.
@@ -403,6 +404,138 @@ class T1Fitter(HasTraits):
             self.fit = self.tfit.run_fit( x0, bounds ).reshape(self.volshape + [2])
         else:
             return x0
+
+
+
+
+
+    def nlreg_hub_wel_fit(self):
+
+        # TODO: run vfa fit to find m0, in order to scale data properly.
+        # want mean(t1) ~ mean(m0)
+
+        def apply_bounds(x, bounds):
+            temp_sz = x.shape
+            x.shape = (-1,2)
+
+            tmp = x[:,0]<bounds[0,0]
+            x[tmp,0]=bounds[0,0]
+
+            tmp = x[:,1]<bounds[0,1]
+            x[tmp,1]=bounds[0,1]
+
+            tmp = x[:,0] > bounds[1,0]
+            x[tmp,0]=bounds[1,0]
+
+            tmp = x[:,1]>bounds[1,1]
+            x[tmp,1]=bounds[1,1]
+
+            x.shape = temp_sz
+
+            return x
+
+        self.vfa_fit()
+
+        tmp = self.fit[...,0]
+        mean_m0 = np.mean(tmp[ self.mask>0].ravel())
+        tmp = self.fit[...,1]
+        mean_t1 = np.mean(tmp[ self.mask>0].ravel())
+
+        datascale = mean_m0 / mean_t1
+
+        self.log.info('Computed VFA for data scaling. Mean m0:{}, T1:{}, scale: {}'.format(
+                mean_m0, mean_t1, datascale ))
+
+        self.data *= 1.0/datascale
+
+        bounds = np.array([[0.001,0.01],[20.0,8.0]])
+
+
+        #setup prior if we're using it
+        if self.l2_lam > 0:
+
+            regl = None
+            if self.l2_mode == 'smooth_vfa':
+
+                #smooth and fit
+                self.make_smooth_vfa()
+                self.prior = self.fit.copy()
+
+                tmp_mask =  self.mask.copy().ravel() > 0
+
+                self.prior.shape=(-1,2)
+                self.prior = apply_bounds(self.prior, bounds)
+                self.prior = self.prior[tmp_mask,1]
+
+                print(sum(self.prior>0))
+                regl = regularization.TikhonovDiffReg3D(self.prior)
+            else:
+                regl = regularization.TikhonovReg3D()
+
+
+            self.l2reg = regl
+
+        if self.l1_lam > 0:
+            self.spatialreg = regularization.ParallelHuber2ClassReg3D(self.volshape + [2],
+                                                delta=self.delta,
+                                                kern_radius=self.kern_sz,
+                                                nthreads=self.nthreads)
+        else:
+            self.log.error('Need l1lam >0 for this routine.')
+
+
+
+        # set up functions for optimizer
+        t1model = model.T1Models(nthreads=self.nthreads)
+
+        self.model_func = t1model.spgr_flat
+        self.model_deriv = t1model.spgr_deriv_mt
+
+
+
+        #make x0
+        self.data.shape = (len(self.flips), -1)
+        # init fitter with our params
+        self.tfit = optim.T1FitNLLSReg(self, debugpath=self.debugpath)
+
+        x0 = []
+
+        if self.start_mode == 'vfa':
+            self.vfa_fit()
+            x0 = self.fit.copy()
+        elif self.start_mode == 'smooth_vfa':
+            self.make_smooth_vfa()
+            x0 = self.fit.copy()
+        elif self.start_mode == 'file':
+            x0 = self.load_startvols()
+        else:
+            #if self.start_mode == 'zero':
+            x0 = np.zeros(self.volshape + [2])
+
+        # make sure we're starting within a valid region for our bounds
+        x0 = apply_bounds(x0, bounds)
+
+
+        #lower tol for first solve
+        self.fit_tol *= 10
+
+        self.fit = self.tfit.run_fit( x0, bounds ).reshape(self.volshape + [2])
+            
+        if self.l1_lam > 0:
+            self.spatialreg = regularization.ParallelWelsch2ClassReg3D(self.volshape + [2],
+                                                delta=self.delta,
+                                                kern_radius=self.kern_sz,
+                                                nthreads=self.nthreads)
+
+        #reopt with welsch.
+        x0 = self.fit[:]
+
+        #only a few iterations
+        self.maxiter = 200
+        self.fit_tol *= 0.1
+        self.fit = self.tfit.run_fit( x0, bounds ).reshape(self.volshape + [2])
+
+
 
 
 

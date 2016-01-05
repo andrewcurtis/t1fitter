@@ -122,10 +122,43 @@ python t1fitter.py  --out ~/tmp/o26/ --nthreads 5 \
   --mask /home/acurtis/tmp/o26/procfa140000_bet_mask_crop.nii.gz  \
   --b1vol /home/acurtis/tmp/o26/b1_mos.nii.gz \
   --fit_method nlreg --verbose --l1lam 6e-4 --kern_radius 2 --delta 0.4 --l2lam 1e-6 --fit_method nlreg --startmode  zero  --b1scale 1.12 --debug_image_path /home/acurtis/tmp/debug_iter --descriptive_names --l2mode smooth_vfa --verbose --l1mode welsch   > fit1.txt   ; \
-  python t1fitter.py  --out ~/tmp/o26/ --nthreads 5 \
+
+
+
+
+# new format. look at 2vols vs 3vols.
+
+t1fit  --out ~/tmp/o26/ --nthreads 5 \
+    --addvol /home/acurtis/tmp/o26/procfa140000_bet_crop.nii.gz 14.0 10.7 \
+    --addvol /home/acurtis/tmp/o26/procfa30000_align_bet_crop.nii.gz 3.0 10.7  \
+    --mask /home/acurtis/tmp/o26/procfa140000_bet_mask_crop.nii.gz  \
+    --b1vol /home/acurtis/tmp/o26/b1_mos.nii.gz \
+    --fit_method nlreg --verbose --l1lam 4e-4 --kern_radius 2 --delta 0.4 --l2lam 1e-6 \
+     --startmode  zero  --b1scale 1.13 --debug_image_path /home/acurtis/tmp/debug_iter \
+     --descriptive_names --l2mode smooth_vfa --verbose --l1mode welsch  ;\
+t1fit  --out ~/tmp/o26/ --nthreads 5 \
     --addvol /home/acurtis/tmp/o26/procfa140000_bet_crop.nii.gz 14.0 10.7 \
     --addvol /home/acurtis/tmp/o26/procfa30000_align_bet_crop.nii.gz 3.0 10.7  \
     --addvol /home/acurtis/tmp/o26/procfa220000_align_bet_crop.nii.gz 22.0 10.7  \
     --mask /home/acurtis/tmp/o26/procfa140000_bet_mask_crop.nii.gz  \
     --b1vol /home/acurtis/tmp/o26/b1_mos.nii.gz \
-    --fit_method nlreg --verbose --l1lam 6e-4 --kern_radius 4 --delta 0.4 --l2lam 1e-6 --fit_method nlreg --startmode  zero  --b1scale 1.12 --debug_image_path /home/acurtis/tmp/debug_iter --descriptive_names --l2mode smooth_vfa --verbose --l1mode welsch > fit2.txt
+    --fit_method nlreg --verbose --l1lam 4e-4 --kern_radius 2 --delta 0.4 --l2lam 1e-6 \
+    --startmode  zero  --b1scale 1.13 --debug_image_path /home/acurtis/tmp/debug_iter \
+    --descriptive_names --l2mode smooth_vfa --verbose --l1mode welsch  ;\
+t1fit  --out ~/tmp/o26/ --nthreads 5 \
+    --addvol /home/acurtis/tmp/o26/procfa140000_bet_crop.nii.gz 14.0 10.7 \
+    --addvol /home/acurtis/tmp/o26/procfa30000_align_bet_crop.nii.gz 3.0 10.7  \
+    --mask /home/acurtis/tmp/o26/procfa140000_bet_mask_crop.nii.gz  \
+    --b1vol /home/acurtis/tmp/o26/b1_mos.nii.gz \
+    --fit_method nlreg --verbose --l1lam 4e-4 --kern_radius 2 --delta 0.4 --l2lam 1e-6 \
+     --startmode  zero  --b1scale 1.13 --debug_image_path /home/acurtis/tmp/debug_iter \
+     --descriptive_names --l2mode smooth_vfa --verbose --l1mode huber  ;\
+t1fit  --out ~/tmp/o26/ --nthreads 5 \
+    --addvol /home/acurtis/tmp/o26/procfa140000_bet_crop.nii.gz 14.0 10.7 \
+    --addvol /home/acurtis/tmp/o26/procfa30000_align_bet_crop.nii.gz 3.0 10.7  \
+    --addvol /home/acurtis/tmp/o26/procfa220000_align_bet_crop.nii.gz 22.0 10.7  \
+    --mask /home/acurtis/tmp/o26/procfa140000_bet_mask_crop.nii.gz  \
+    --b1vol /home/acurtis/tmp/o26/b1_mos.nii.gz \
+    --fit_method nlreg --verbose --l1lam 4e-4 --kern_radius 2 --delta 0.4 --l2lam 1e-6 \
+    --startmode  zero  --b1scale 1.13 --debug_image_path /home/acurtis/tmp/debug_iter \
+    --descriptive_names --l2mode smooth_vfa --verbose --l1mode huber  ;

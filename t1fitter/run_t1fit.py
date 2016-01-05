@@ -69,7 +69,7 @@ def gen_cli():
     #fitting options
     fit_group = parser.add_argument_group('Fitting options')
 
-    fit_group.add_argument('--fit_method', choices=['vfa','emos','nlreg'], default='vfa',
+    fit_group.add_argument('--fit_method', choices=['vfa','emos','nlreg','hub_wel'], default='vfa',
                         help='Fit method.')
     fit_group.add_argument('--l1lam', type=float, default=1e-3,
                         help='l1 lambda: scaling factor for spatial regularizer, 0 == disabled')
@@ -195,7 +195,7 @@ def main():
 
     if args.descriptive_names:
 
-        if fitter.fit_method == 'nlreg':
+        if fitter.fit_method is not 'vfa':
             if fitter.l1_lam > 0:
                 fitter.outname = fitter.outname + '_l1{}_k{}_d{}_m{}'.format(fitter.l1_lam,
                                         fitter.kern_sz, fitter.delta, fitter.l1_mode)
