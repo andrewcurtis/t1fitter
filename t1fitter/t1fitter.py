@@ -47,7 +47,7 @@ class T1Fitter(HasTraits):
     mask = Array
 
     # NLreg Fit returns a OptimizationResult which is like a dict.
-    # other fits just create an Array.
+    # other fits just create an Array, so we just have a generic object type here
     fit = Python
     prior = Array
 
@@ -56,28 +56,31 @@ class T1Fitter(HasTraits):
     #remember affine matrix for output
     base_image_affine = Array
 
+    #Add fit methods here.
     fit_method = Enum('vfa','emos','nlreg','hub_wel')
 
     #fitting parameters
     t1_range = Array
     m0_range = Array
     kern_sz = Int(1)
-    #recriprocal huber cutoff
+
+    #width of l1 window. should be small enough to separate classes (T1s) in L1 region
+    # but large enough to capture noise variation within L2 region.
     delta = Float(0.5)
-    #params for BFGS
+
+    #params for L-BFGS
     fit_tol = Float(1e-5)
     maxcor = Int(15)
     maxiter = Int(300)
     maxfun = Int(3000)
-    nthreads = Int(4)
 
+    nthreads = Int(4)
 
     #Regularization options
     l1_lam = Float(5e-4)
     l1_mode = Enum('huber','welsch')
 
     l2_lam = Float(2e-6)
-    l2_prior = Bool(False)
     l2_mode = Enum('zero','vfa','smooth_vfa')
 
     start_mode = Enum('zero','vfa','smooth_vfa','file')

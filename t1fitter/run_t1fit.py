@@ -17,7 +17,7 @@ import nibabel as nib
 
 def gen_cli():
 
-    parser = argparse.ArgumentParser(description='T1fitter. VFA, eMOS, and NLReg, ' +
+    parser = argparse.ArgumentParser(description='T1fitter. VFA, NLReg, ' +
                                             'with optional preprocessing.')
 
     basic_group = parser.add_argument_group('Main Arguments')
@@ -108,11 +108,13 @@ def gen_cli():
 
 
 def main():
+    # Create a parser CLI and eval args
 
     parser = gen_cli()
     args = parser.parse_args()
 
 
+    # create fitter instance and set values based on our command line
     fitter = t1fitter.T1Fitter()
     fitter.log.info('Parsing CLI: {}')
 
