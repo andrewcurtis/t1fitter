@@ -45,6 +45,7 @@ class T1Fitter(HasTraits):
     b1map = Array
     data = Array
     mask = Array
+
     # NLreg Fit returns a OptimizationResult which is like a dict.
     # other fits just create an Array.
     fit = Python
@@ -62,7 +63,7 @@ class T1Fitter(HasTraits):
     m0_range = Array
     kern_sz = Int(1)
     #recriprocal huber cutoff
-    delta = Float(0.3)
+    delta = Float(0.5)
     #params for BFGS
     fit_tol = Float(1e-5)
     maxcor = Int(15)
@@ -282,9 +283,9 @@ class T1Fitter(HasTraits):
         self.fit = tfit.vfa_fit(flips, data, trs[0], b1 )
         self.fit.shape = self.volshape + [2]
 
-        toobig = self.fit[...,1]>10.0
-        self.fit[toobig] = 10.0
-        self.fit[self.fit<0.0] = 0.0
+        #toobig = self.fit[...,1]>60.0
+        #self.fit[toobig] = 60.0
+        #self.fit[self.fit<0.0] = 0.0
 
         self.log.info('after vfa_fit, datasize is: {}'.format(self.data.shape))
         self.log.info('after vfa_fit, fit size is: {}'.format(self.fit.shape))
@@ -520,7 +521,7 @@ class T1Fitter(HasTraits):
         self.fit_tol *= 10
 
         self.fit = self.tfit.run_fit( x0, bounds ).reshape(self.volshape + [2])
-            
+
         if self.l1_lam > 0:
             self.spatialreg = regularization.ParallelWelsch2ClassReg3D(self.volshape + [2],
                                                 delta=self.delta,

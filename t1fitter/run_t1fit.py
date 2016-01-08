@@ -80,6 +80,12 @@ def gen_cli():
     fit_group.add_argument('--delta', type=float, default=0.4,
                         help='Spatial regularizer scale factor.')
 
+    fit_group.add_argument('--tol', type=float, default=1e-5,
+                        help='Fitting tolerance.')
+    fit_group.add_argument('--maxiter', type=int, default=300,
+                        help='Optimizer iteration limit.')
+    fit_group.add_argument('--maxfun', type=int, default=3000,
+                        help='Function evaluation limit.')
 
 
     fit_group.add_argument('--l2lam', type=float, default=0.0,
@@ -114,6 +120,10 @@ def main():
 
     fitter.nthreads = args.nthreads
     fitter.b1scale = args.b1scale
+
+    fitter.fit_tol = args.tol
+    fitter.maxiter = args.maxiter
+    fitter.maxfun  = args.maxfun
 
     fitter.l1_lam = args.l1lam
     fitter.l2_lam = args.l2lam
@@ -188,11 +198,20 @@ def main():
             fitter.run_preproc_b1mos(args.mosvol)
             new_cli = new_cli + ' --b1vol {} '.format(fitter.b1vol)
 
+
+    #Check data sizes will also determine if we are missing volumes (mask, b1, etc)
+    # and create some sensible defaults.
+    fitter.check_data_sizes()
+
     fitter.b1map *= fitter.b1scale
 
-    fitter.check_data_sizes()
+
+    # set ouput name. Basic is t1_method and m0_method.
     fitter.outname = fitter.fit_method
 
+    # add detail to filename. Useful for when you're doing many fits
+    # e.g. arraying over parameters.
+    #Can always add more info the the names here.
     if args.descriptive_names:
 
         if fitter.fit_method is not 'vfa':
@@ -206,6 +225,7 @@ def main():
                                         fitter.fit_tol, fitter.maxcor, len(fitter.file_list))
 
 
+    # report modified filenames for future use.
     if len(new_cli) > 0:
         print('\nProcessing changed files. If you want to rerun the fitting ' +
              ' with different arguments, please use the following command line options:\n\n')
