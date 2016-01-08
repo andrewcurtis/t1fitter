@@ -72,7 +72,7 @@ def gen_cli():
 
     fit_group.add_argument('--fit_method', choices=['vfa','emos','nlreg','hub_wel'], default='vfa',
                         help='Fit method.')
-    fit_group.add_argument('--l1lam', type=float, default=1e-3,
+    fit_group.add_argument('--l1lam', type=float, default=5e-4,
                         help='l1 lambda: scaling factor for spatial regularizer, 0 == disabled')
     fit_group.add_argument('--l1mode', choices=['huber','welsch'], default='huber',
                         help='pseudo-l1 spatial regularizer mode -- huber or welsch. ')
@@ -89,7 +89,7 @@ def gen_cli():
                         help='Function evaluation limit.')
 
 
-    fit_group.add_argument('--l2lam', type=float, default=0.0,
+    fit_group.add_argument('--l2lam', type=float, default=1e-6,
                         help='l2 lambda: scaling factor for Tikhonov regularizer. 0 == disabled')
     fit_group.add_argument('--l2mode', choices=['zero','vfa','smooth_vfa'], default='smooth_vfa',
                         help='l2 Tikhonov regularizer mode -- Distance from [smooth] prior, or zero (normal Tik). ')
