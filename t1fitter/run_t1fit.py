@@ -18,7 +18,8 @@ import nibabel as nib
 def gen_cli():
 
     parser = argparse.ArgumentParser(description='T1fitter. VFA, NLReg, ' +
-                                            'with optional preprocessing.')
+                                    'with optional preprocessing.',
+                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     basic_group = parser.add_argument_group('Main Arguments')
     basic_group.add_argument('--addvol', nargs=3,  action='append', metavar=('vol','flip','tr'), required=True,
@@ -90,10 +91,10 @@ def gen_cli():
 
     fit_group.add_argument('--l2lam', type=float, default=0.0,
                         help='l2 lambda: scaling factor for Tikhonov regularizer. 0 == disabled')
-    fit_group.add_argument('--l2mode', choices=['zero','vfa','smooth_vfa'], default='zero',
+    fit_group.add_argument('--l2mode', choices=['zero','vfa','smooth_vfa'], default='smooth_vfa',
                         help='l2 Tikhonov regularizer mode -- Distance from [smooth] prior, or zero (normal Tik). ')
-    fit_group.add_argument('--smooth_prior', type=float, default=12.0,
-                        help='Smoothing for Prior\'n')
+    #fit_group.add_argument('--smooth_prior', type=float, default=12.0,
+    #                    help='Smoothing for Prior')
     fit_group.add_argument('--startmode', choices=['zero','vfa','smooth_vfa','file'], default='zero',
                         help='Start mode -- start from zero or from vfa guess. ')
     fit_group.add_argument('--startvols', nargs=2,  action='append', metavar=('m0','t1'),
@@ -143,6 +144,9 @@ def main():
     fitter.smooth_fac = args.smooth
 
     fitter.outpath = args.out
+
+    if not os.path.exists(fitter.outpath):
+        os.makedirs(fitter.outpath)
 
     if args.verbose:
         fitter.log.setLevel(logging.INFO)

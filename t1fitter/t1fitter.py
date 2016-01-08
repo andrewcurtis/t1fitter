@@ -40,28 +40,28 @@ class T1Fitter(HasTraits):
     b1scale = Float(1.0)
 
     #data
-    trs = Array
-    flips = Array
-    b1map = Array
-    data = Array
+    trs = Array(dtype=float)
+    flips = Array(dtype=float)
+    b1map = Array(dtype=float)
+    data = Array(dtype=float)
     mask = Array
 
     # NLreg Fit returns a OptimizationResult which is like a dict.
     # other fits just create an Array, so we just have a generic object type here
     fit = Python
-    prior = Array
+    prior = Array(dtype=float)
 
     #Store base volume shape
     volshape = List
     #remember affine matrix for output
-    base_image_affine = Array
+    base_image_affine = Array(dtype=float)
 
     #Add fit methods here.
     fit_method = Enum('vfa','emos','nlreg','hub_wel')
 
     #fitting parameters
-    t1_range = Array
-    m0_range = Array
+    t1_range = Array(dtype=float)
+    m0_range = Array(dtype=float)
     kern_sz = Int(1)
 
     #width of l1 window. should be small enough to separate classes (T1s) in L1 region
@@ -560,7 +560,7 @@ class T1Fitter(HasTraits):
         if np.prod(self.b1map.shape) > 0:
             assert(self.b1map.shape == self.mask.shape)
         else:
-            self.b1map = np.ones_like(self.mask)
+            self.b1map = np.ones(self.mask.shape, dtype='float')
 
         #data is #vols x space, each vol needs to match mask/b1
         assert(self.data.shape[0] == self.flips.shape[0])
